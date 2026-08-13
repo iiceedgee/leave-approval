@@ -1,0 +1,198 @@
+const bcrypt = require('bcryptjs');
+
+// =====================================================
+//  SupabaseStore — ที่เก็บข้อมูลจริงใน Supabase (Postgres)
+//  ⭐ ไฟล์นี้คือ "ตัวใหม่" ที่เพิ่งเขียนตอนเชื่อม Supabase
+//
+//  Method ชื่อเดียวกับ InMemoryStore ทุกตัว
+//  → service จะเลือก db ตัวไหนก็ได้ โดย logic ไม่เปลี่ยน
+//
+//  ใช้ `supabase.from('users')...` โดยตรง ไม่มี repository layer
+//  (Minimal scope — ตัด repository ออกเพื่อให้เข้าใจง่าย)
+// =====================================================
+
+class SupabaseStore {
+  constructor(supabaseClient) {
+    this.supabase = supabaseClient;
+    this.auditLogs = []; // audit log ยังเป็น in-memory (ไว้ต่อเฟส 6)
+  }
+
+  // ---- Seed users (password: 123456) ใช้ตอนเริ่ม server ----
+  // เหมือน seed ใน store.js แต่ครั้งนี้ลงตารางในคลาวด์จริง
+  // เช็คก่อนว่าในตารางมี user แล้วหรือยัง (กัน insert ซ้ำทุกครั้งที่ boot)
+  async seed() {
+    const { data: existing } = await this.supabase.from('users').select('id').limit(1);
+    if (existing && existing.length > 0) {
+      console.log('[DB] Supabase: users already exist, skip seed');
+      return;
+    }
+
+    const hash = await bcrypt.hash('123456', 10);
+    const users = [
+      { username: 'emp01', password_hash: hash, full_name: 'สมชาย ใจดี', role: 'emp', department: 'ฝ่ายผลิต', status: 'Y' },
+      { username: 'emp02', password_hash: hash, full_name: 'สมหญิง รักดี', role: 'emp', department: 'ฝ่ายผลิต', status: 'Y' },
+      { username: 'mgr01', password_hash: hash, full_name: 'มานะ ขยัน', role: 'mgr', department: 'ฝ่ายผลิต', status: 'Y' },
+      { username: 'hr01', password_hash: hash, full_name: 'กรรณิการ์ งานดี', role: 'hr', department: 'ฝ่ายทรัพยากรบุคคล', status: 'Y' },
+    ];
+
+    const { error } = await this.supabase.from('users').insert(users);
+    if (error) console.error('[DB] Seed error:', error.message);
+    else console.log('[DB] Supabase seed users: emp01, emp02, mgr01, hr01');
+  }
+
+  async getCounts() {
+    const { count: users } = await this.supabase.from('users').select('*', { count: 'exact', head: true });
+    const { count: leaves } = await this.supabase.from('leave_requests').select('*', { count: 'exact', head: true });
+    return { users, leaves };
+  }
+
+  // ---- users ----
+  // เหมือน this.users.find(...) ใน InMemoryStore
+  // แต่ query ไปที่ตาราง users ใน Supabase จริง
+  // maybeSingle = ขอแค่ 1 แถว (ถ้าไม่เจอได้ null)
+  async findUserByUsername(username) {
+    const { data } = await this.supabase.from('users').select('*').eq('username', username).maybeSingle();
+    return data || null;
+  }
+
+  async findUserById(id) {
+    const { data } = await this.supabase.from('users').select('*').eq('id', id).maybeSingle();
+    return data || null;
+  }
+
+  async listUsers() {
+    const { data } = await this.supabase.from('users').select('*');
+    return data || [];
+  }
+
+  async createUser(data) {
+    const { data: user, error } = await this.supabase
+      .from('users')
+      .insert({ ...data })
+      .select()
+      .single();
+    if (error) throw error;
+    return user;
+  }
+
+  // ---- leaves ----
+  // insert + .select().single() = ส่งเข้าแล้วขอข้อมูลที่ insert กลับมา
+  // (id, created_at ฯลฯ ที่ database สร้างให้)
+  async createLeave(data) {
+    const { data: leave, error } = await this.supabase
+      .from('leave_requests')
+      .insert(data)
+      .select()
+      .single();
+    if (error) throw error;
+    return leave;
+  }
+
+  async getLeaveById(id) {
+    const { data } = await this.supabase.from('leave_requests').select('*').eq('id', id).maybeSingle();
+    return data || null;
+  }
+
+  async listLeaves() {
+    const { data } = await this.supabase.from('leave_requests').select('*');
+    return data || [];
+  }
+
+  async updateLeave(id, fields) {
+    const { data: leave, error } = await this.supabase
+      .from('leave_requests')
+      .update(fields)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return leave;
+  }
+
+  // ---- history ----
+  async addHistory(data) {
+    const { data: item, error } = await this.supabase
+      .from('leave_status_history')
+      .insert(data)
+      .select()
+      .single();
+    if (error) throw error;
+    return item;
+  }
+
+  async listHistoryByLeave(leaveId) {
+    const { data } = await this.supabase
+      .from('leave_status_history')
+      .select('*')
+      .eq('leave_request_id', leaveId)
+      .order('created_at', { ascending: true });
+    return data || [];
+  }
+
+  // ---- documents ----
+  // ตาราง documents ใช้ is_deleted = 'Y'/'N' (อักขระ)
+  // แต่ใน memory ใช้ true/false → ต้องแปลงให้ตรงกันตอนส่งออก
+  async createDocument(data) {
+    const { data: doc, error } = await this.supabase
+      .from('documents')
+      .insert({ ...data, is_deleted: 'N' })
+      .select()
+      .single();
+    if (error) throw error;
+    return { ...doc, is_deleted: doc.is_deleted === 'Y' };
+  }
+
+  async listDocumentsByLeave(leaveId) {
+    const { data } = await this.supabase
+      .from('documents')
+      .select('*')
+      .eq('leave_request_id', leaveId)
+      .eq('is_deleted', 'N')
+      .order('created_at', { ascending: true });
+    return (data || []).map(d => ({ ...d, is_deleted: d.is_deleted === 'Y' }));
+  }
+
+  async findDocument(leaveId, fileId) {
+    const { data } = await this.supabase
+      .from('documents')
+      .select('*')
+      .eq('id', fileId)
+      .eq('leave_request_id', leaveId)
+      .maybeSingle();
+    if (!data || data.is_deleted === 'Y') return null;
+    return { ...data, is_deleted: false };
+  }
+
+  async softDeleteDocument(fileId) {
+    const { data: doc, error } = await this.supabase
+      .from('documents')
+      .update({ is_deleted: 'Y' })
+      .eq('id', fileId)
+      .select()
+      .single();
+    if (error) throw error;
+    return { ...doc, is_deleted: true };
+  }
+
+  // ---- verifications ----
+  async addVerification(data) {
+    const { data: item, error } = await this.supabase
+      .from('document_verifications')
+      .insert(data)
+      .select()
+      .single();
+    if (error) throw error;
+    return item;
+  }
+
+  async listVerificationsByLeave(leaveId) {
+    const { data } = await this.supabase
+      .from('document_verifications')
+      .select('*')
+      .eq('leave_request_id', leaveId)
+      .order('created_at', { ascending: true });
+    return data || [];
+  }
+}
+
+module.exports = { SupabaseStore };

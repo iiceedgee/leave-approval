@@ -1,0 +1,98 @@
+.page-container { max-width: 1000px; margin: 32px auto; padding: 0 20px; }
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 12px;
+  h2 { color: #0E3362; margin: 0; }
+}
+.header-right { display: flex; align-items: center; gap: 12px; }
+.badge { background: #e8eaf6; padding: 6px 12px; border-radius: 4px; font-size: 13px; color: #0E3362; }
+
+.back-row { margin-bottom: 16px; }
+.back-btn { background: none; border: none; color: #0E3362; font-size: 15px; cursor: pointer; padding: 0; }
+
+.info-grid { display: flex; gap: 24px; flex-wrap: wrap; }
+.info-item { flex: 1; min-width: 140px; }
+.info-item label { display: block; font-size: 12px; color: #888; margin-bottom: 4px; }
+.info-item span { font-size: 15px; font-weight: 500; }
+.highlight-orange { color: #E65100; }
+.detail-row { margin-top: 16px; }
+.detail-row label { font-size: 12px; color: #888; display: block; margin-bottom: 4px; }
+.detail-row p { margin: 0; font-size: 14px; line-height: 1.5; }
+
+.stepper-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.stepper-header h4 { margin: 0; color: #333; }
+.stepper-info-actions { display: flex; align-items: center; gap: 8px; }
+
+.action-panel {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  margin-bottom: 20px;
+  h4 { margin: 0 0 12px; }
+}
+
+.remark-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  box-sizing: border-box;
+  resize: vertical;
+  font-family: inherit;
+  margin-top: 12px;
+}
+
+.action-btns {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.cancel-panel { border-top: 1px solid #ffcdd2; }
+
+.loading { text-align: center; padding: 40px; color: #999; font-size: 16px; }
+
+.celebration-overlay { position: fixed; inset: 0; z-index: 1999; overflow: hidden; }
+
+@keyframes curtain-up   { to { transform: translateY(-100%); } }
+@keyframes curtain-down { to { transform: translateY(100%); } }
+.curtain-top    { position: absolute; left: 0; right: 0; top: 0; height: 50%; background: #0E3362;
+                  animation: curtain-up 0.7s ease-out forwards; }
+.curtain-bottom { position: absolute; left: 0; right: 0; bottom: 0; height: 50%; background: #0E3362;
+                  animation: curtain-down 0.7s ease-out forwards; }
+
+.celebration-card {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 16px;
+  animation: card-pop 0.6s 0.5s ease-out both;
+}
+@keyframes card-pop { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+.checkmark { width: 80px; height: 80px; }
+.checkmark circle, .checkmark path { fill: none; stroke: #2e7d32; stroke-width: 3; }
+.checkmark circle { stroke-dasharray: 166; stroke-dashoffset: 166; animation: draw 0.6s ease-out forwards; }
+.checkmark path { stroke-dasharray: 48; stroke-dashoffset: 48; animation: draw 0.4s 0.6s ease-out forwards; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+
+.confetti-container { position: absolute; inset: 0; overflow: hidden; }
+.confetti-piece {
+  position: absolute; top: -20px; width: 10px; height: 14px; border-radius: 2px;
+  animation: confetti-fall 3s ease-in infinite;
+}
+@keyframes confetti-fall {
+  0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+}
+.celebration-card h3 { margin: 0; color: #0E3362; }
+
+@media (prefers-reduced-motion: reduce) {
+  .celebration-overlay * { animation: none !important; transition: none !important; }
+}

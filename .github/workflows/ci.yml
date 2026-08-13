@@ -1,0 +1,104 @@
+# ------------------------------------------------------------------
+# CI Pipeline for leave-approval-ui (Angular)
+# ------------------------------------------------------------------
+# Triggers:
+#   - push to main
+#   - pull requests against main
+#
+# Stages:
+#   1. Install   — npm ci (fast, reproducible install)
+#   2. Lint      — skipped (no lint script or architect configured)
+#   3. Test      — skipped (no test script or architect configured)
+#   4. Build     — npm run build (ng build, production by default)
+#   5. Archive   — upload dist/ as a workflow artifact
+# ------------------------------------------------------------------
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Allow one concurrent run per branch/PR; cancel in-progress if a newer
+# commit is pushed.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: 20.x                     # LTS as of 2026
+
+jobs:
+  # ──────────────────────────────────────────────────────────────
+  #  Build & quality checks
+  # ──────────────────────────────────────────────────────────────
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: angular-ui    # all steps run inside angular-ui/
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: angular-ui/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # ── Lint ────────────────────────────────────────────────
+      # NOTE: This project does not have a lint script or a lint
+      # architect target configured.  If you add one in the future
+      # (e.g. @angular-eslint/schematics), uncomment the step below.
+      #
+      # - name: Lint
+      #   run: npm run lint
+
+      # ── Build ───────────────────────────────────────────────
+      - name: Build (production)
+        run: npm run build
+        # npm run build calls `ng build` which uses the production
+        # configuration by default (see angular.json).
+
+      # ── Archive ─────────────────────────────────────────────
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: angular-ui-dist
+          path: angular-ui/dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  # ──────────────────────────────────────────────────────────────
+  #  Test job  —  (disabled – no test configuration found)
+  # ──────────────────────────────────────────────────────────────
+  # This project does not define a `test` script in package.json
+  # nor a `test` architect target in angular.json.  Once unit/e2e
+  # tests are added, create a separate test job below:
+  #
+  # test:
+  #   name: Test
+  #   needs: build
+  #   runs-on: ubuntu-latest
+  #   defaults:
+  #     run:
+  #       working-directory: angular-ui
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: ${{ env.NODE_VERSION }}
+  #         cache: npm
+  #         cache-dependency-path: angular-ui/package-lock.json
+  #     - run: npm ci
+  #     - run: npm test            # or: npx ng test --no-watch --browsers=ChromeHeadless

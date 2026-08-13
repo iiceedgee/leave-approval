@@ -1,0 +1,31 @@
+import { Component } from '@angular/core';
+import { Router } from '@angular/router';
+import { AuthService } from '../../services/auth.service';
+
+@Component({
+  standalone: false,
+  selector: 'app-login',
+  templateUrl: './login.component.html',
+  styleUrls: ['./login.component.scss']
+})
+export class LoginComponent {
+  username = '';
+  password = '';
+  error = '';
+
+  constructor(private auth: AuthService, private router: Router) {}
+
+  login(): void {
+    if (!this.username || !this.password) {
+      this.error = 'กรุณากรอก username และ password';
+      return;
+    }
+    this.error = '';
+    this.auth.login(this.username, this.password).subscribe({
+      next: (res) => {
+        this.router.navigate([res.user.role === 'emp' ? '/leave/new' : '/dashboard']);
+      },
+      error: (err) => { this.error = err.error?.message || 'เข้าสู่ระบบไม่สำเร็จ'; }
+    });
+  }
+}

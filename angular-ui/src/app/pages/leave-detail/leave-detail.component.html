@@ -1,0 +1,147 @@
+<div class="page-container" *ngIf="!loading && leave">
+  <div class="header">
+    <h2>คำขอลา #{{ leave.id }}</h2>
+    <div class="header-right">
+      <app-notification-bell></app-notification-bell>
+      <span class="badge">{{ user?.fullName }} ({{ user?.role }})</span>
+      <button class="btn-sm-logout" (click)="logout()">ออกจากระบบ</button>
+    </div>
+  </div>
+
+  <div class="back-row">
+    <button class="back-btn" [routerLink]="'/dashboard'">← กลับ</button>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3>รายละเอียดคำขอ</h3>
+      <app-status-badge [statusCode]="leave.current_status"></app-status-badge>
+    </div>
+    <div class="info-grid">
+      <div class="info-item"><label>ประเภท</label><span>{{ leave.leave_type }}</span></div>
+      <div class="info-item"><label>วันที่</label><span>{{ leave.start_date }} ~ {{ leave.end_date }}</span></div>
+      <div class="info-item" *ngIf="leave.flag_send_back === 'Y'">
+        <label>ส่งกลับรอบที่</label><span class="highlight-orange">{{ leave.send_back_count }}</span>
+      </div>
+    </div>
+    <div class="detail-row" *ngIf="leave.reason">
+      <label>เหตุผล</label><p>{{ leave.reason }}</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="stepper-header">
+      <h4>สถานะคำขอ</h4>
+      <div class="stepper-info-actions">
+        <button class="btn-link" (click)="showTimeline = true">ดูสถานะทั้งหมด ▸</button>
+      </div>
+    </div>
+    <app-stepper [steps]="stepperSteps"></app-stepper>
+  </div>
+
+  <div class="action-panel" *ngIf="canDoPretemp">
+    <h4>ตรวจสอบเอกสาร (ความครบถ้วน)</h4>
+    <app-upload-zone
+      [leaveId]="leave.id"
+      [uploadFn]="onVerificationUpload.bind(this)"
+      [canDelete]="true"
+    ></app-upload-zone>
+    <textarea
+      class="remark-input"
+      rows="2"
+      [(ngModel)]="pretempRemark"
+      placeholder="หมายเหตุ"
+    ></textarea>
+    <div class="action-btns">
+      <button class="btn btn-approve" (click)="handlePretempPass()">✓ เอกสารครบถ้วน</button>
+      <button class="btn btn-sendback" (click)="handlePretempSendBack()">↺ ส่งกลับแก้ไข</button>
+    </div>
+  </div>
+
+  <div class="action-panel" *ngIf="canDoTemp">
+    <h4>ตรวจสอบเอกสาร (ความถูกต้อง)</h4>
+    <app-upload-zone
+      [leaveId]="leave.id"
+      [uploadFn]="onVerificationUpload.bind(this)"
+      [canDelete]="true"
+    ></app-upload-zone>
+    <textarea
+      class="remark-input"
+      rows="2"
+      [(ngModel)]="tempRemark"
+      placeholder="หมายเหตุ"
+    ></textarea>
+    <div class="action-btns">
+      <button class="btn btn-approve" (click)="handleTempPass()">✓ เอกสารถูกต้อง</button>
+      <button class="btn btn-sendback" (click)="handleTempSendBack()">↺ ส่งกลับแก้ไข</button>
+    </div>
+  </div>
+
+  <div class="action-panel" *ngIf="showApprovalPanel">
+    <h4>อนุมัติคำขอ</h4>
+    <textarea
+      class="remark-input"
+      rows="2"
+      [(ngModel)]="approvalRemark"
+      placeholder="หมายเหตุ (ถ้ามี)"
+    ></textarea>
+    <div class="action-btns">
+      <button class="btn btn-approve" *ngIf="canApprove" (click)="handleApprove()">✓ อนุมัติ</button>
+      <button class="btn btn-sendback" *ngIf="canSendBack" (click)="handleSendBack()">↺ ส่งกลับแก้ไข</button>
+      <button class="btn btn-reject" *ngIf="canReject" (click)="handleReject()">✕ ไม่อนุมัติ</button>
+    </div>
+  </div>
+
+  <div class="action-panel" *ngIf="canUploadDoc">
+    <h4>{{ leave.flag_send_back === 'Y' ? 'อัปโหลดเอกสารใหม่' : 'แนบเอกสาร' }}</h4>
+    <p *ngIf="leave.flag_send_back === 'Y'">
+      คำขอถูกส่งกลับ กรุณาแก้ไขเอกสารและอัปโหลดใหม่
+    </p>
+    <p *ngIf="leave.flag_send_back !== 'Y'">
+      กรุณาแนบเอกสารประกอบคำขอ (PDF, JPG, PNG, DOCX สูงสุด 10MB/ไฟล์)
+    </p>
+    <app-upload-zone
+      [leaveId]="leave.id"
+      [uploadFn]="onEmpUpload.bind(this)"
+      [deleteFn]="onEmpDelete.bind(this)"
+      [canDelete]="canEmpDelete.bind(this)"
+    ></app-upload-zone>
+  </div>
+
+  <div class="action-panel cancel-panel" *ngIf="canCancel">
+    <h4>ยกเลิกคำขอ</h4>
+    <p>หากต้องการยกเลิกคำขอนี้ กรุณากดปุ่มด้านล่าง</p>
+    <button class="btn btn-cancel" (click)="handleCancel()">✕ ยกเลิกคำขอ</button>
+  </div>
+
+  <div class="action-panel" *ngIf="canResubmit">
+    <h4>คำขอถูกส่งกลับ</h4>
+    <p>กรุณาแก้ไขและส่งคำขออีกครั้ง</p>
+    <button class="btn btn-primary" [routerLink]="'/leave/' + leave.id + '/edit'">ไปที่แบบฟอร์ม</button>
+  </div>
+</div>
+
+<div class="loading" *ngIf="loading">กำลังโหลด...</div>
+
+<app-timeline
+  [items]="timelineItems"
+  [visible]="showTimeline"
+  (close)="showTimeline = false"
+></app-timeline>
+
+<div class="celebration-overlay" *ngIf="showCelebration">
+  <div class="curtain-top"></div>
+  <div class="curtain-bottom"></div>
+  <div class="celebration-card">
+    <svg class="checkmark" viewBox="0 0 52 52">
+      <circle cx="26" cy="26" r="24" />
+      <path d="M14 27l8 8 16-16" />
+    </svg>
+    <h3>อนุมัติสำเร็จ!</h3>
+  </div>
+  <div class="confetti-container">
+    <span class="confetti-piece" *ngFor="let c of confettiPieces"
+      [style.left]="c.left" [style.background]="c.color"
+      [style.animation-delay]="c.delay" [style.animation-duration]="c.duration"></span>
+  </div>
+</div>

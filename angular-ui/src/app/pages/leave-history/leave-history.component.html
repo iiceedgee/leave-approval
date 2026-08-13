@@ -1,0 +1,109 @@
+<div class="history-page">
+  <!-- Header -->
+  <div class="page-header">
+    <div class="header-left">
+      <a class="btn-back" routerLink="/dashboard" [attr.aria-label]="'กลับ'">
+        <i class="fa-solid fa-arrow-left"></i>
+      </a>
+      <h2><i class="fa-regular fa-calendar"></i> ประวัติการลาของฉัน</h2>
+    </div>
+    <div class="header-right">
+      <app-notification-bell></app-notification-bell>
+      <span class="user-badge">
+        <i class="fa-regular fa-user"></i> {{ user?.fullName }}
+      </span>
+      <button class="btn-logout" (click)="logout()">
+        <i class="fa-solid fa-right-from-bracket"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Year Picker -->
+  <div class="controls-row">
+    <div class="year-picker">
+      <label for="yearSelect">ปี</label>
+      <select id="yearSelect" [(ngModel)]="selectedYear" (change)="onYearChange()">
+        <option *ngFor="let y of years" [value]="y">{{ toBuddhistYear(y) }}</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div class="loading" *ngIf="loading">กำลังโหลด...</div>
+
+  <!-- Error -->
+  <div class="result-error" *ngIf="errorMessage">
+    <i class="fa-solid fa-circle-exclamation"></i> {{ errorMessage }}
+  </div>
+
+  <!-- Balance Cards -->
+  <div class="balance-grid" *ngIf="!loading">
+    <div class="balance-card" *ngFor="let b of balances">
+      <div class="card-header">{{ b.leave_type }}</div>
+      <div class="card-numbers">
+        <span class="used">{{ b.used }}</span>
+        <span class="separator">/</span>
+        <span class="quota">{{ b.quota }}</span>
+        <span class="unit">วัน</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" [style.width.%]="calcProgress(b.used, b.quota)"
+             [class.danger]="b.remaining <= 3" [class.warning]="b.remaining <= 5 && b.remaining > 3">
+        </div>
+      </div>
+      <div class="remaining" [class.danger]="b.remaining <= 3" [class.warning]="b.remaining <= 5 && b.remaining > 3">
+        เหลือ {{ b.remaining }} วัน
+      </div>
+    </div>
+  </div>
+
+  <!-- Filter -->
+  <div class="filter-row" *ngIf="!loading">
+    <div class="filter-group">
+      <label for="typeFilter">กรองตามประเภท</label>
+      <select id="typeFilter" [(ngModel)]="filterType">
+        <option value="">ทั้งหมด</option>
+        <option *ngFor="let b of balances" [value]="b.leave_type">{{ b.leave_type }}</option>
+      </select>
+    </div>
+    <span class="record-count">ทั้งหมด {{ filteredHistory.length }} รายการ</span>
+  </div>
+
+  <!-- History Table -->
+  <div class="table-card" *ngIf="!loading && filteredHistory.length > 0">
+    <table class="history-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>ประเภท</th>
+          <th>วันที่</th>
+          <th class="col-center">จำนวนวัน</th>
+          <th>สถานะ</th>
+          <th class="col-center"></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let item of filteredHistory; let i = index">
+          <td>{{ i + 1 }}</td>
+          <td><span class="leave-type-tag">{{ item.leave_type }}</span></td>
+          <td>{{ formatThaiDateRange(item.start_date, item.end_date) }}</td>
+          <td class="col-center">{{ item.used_days }}</td>
+          <td>
+            <span class="status-tag" [ngClass]="getStatusClass(item.current_status)">
+              {{ getStatusLabel(item.current_status) }}
+            </span>
+          </td>
+          <td class="col-center">
+            <button class="btn-sm" (click)="viewDetail(item.id)">ดู</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Empty state -->
+  <div class="empty-state" *ngIf="!loading && filteredHistory.length === 0">
+    <i class="fa-regular fa-calendar-xmark"></i>
+    <p>ไม่มีประวัติการลาในปีนี้</p>
+  </div>
+</div>

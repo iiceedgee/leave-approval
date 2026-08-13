@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Angular build artifacts
+angular-ui/dist/
+.angular/
+
+# Environment & secrets
+leave-api/.env
+
+# Runtime uploads
+leave-api/uploads/
+
+# AI tooling (kept locally, never pushed)
+.opencode/
+HOW-TO-SUBAGENTS-AUTO-DISPATCH.md
+
+# Personal review notes (kept locally, never pushed)
+BUGFIX_REPORT.md
+DOCKER_CI_CD_GUIDE.md
+.opencode
+
+# All documentation kept local only (not pushed to GitHub)
+*.md

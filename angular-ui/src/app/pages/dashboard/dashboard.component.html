@@ -1,0 +1,47 @@
+<div class="page-container">
+  <div class="header">
+    <h2>{{ title }}</h2>
+    <div class="header-right">
+      <app-notification-bell></app-notification-bell>
+      <span class="badge">{{ user?.fullName }} ({{ roleLabels[user?.role || ''] || '' }})</span>
+      <button class="btn-sm-logout" (click)="logout()">ออกจากระบบ</button>
+    </div>
+  </div>
+
+  <div class="emp-actions" *ngIf="user?.role === 'emp'">
+    <button class="btn btn-primary" [routerLink]="'/leave/new'"><i class="fa-regular fa-plus"></i> ยื่นคำขอลา</button>
+    <button class="btn btn-outline" [routerLink]="'/my-leaves/history'">
+      <i class="fa-regular fa-calendar"></i> ประวัติการลา
+    </button>
+  </div>
+
+  <div class="loading" *ngIf="loading">กำลังโหลด...</div>
+
+  <table class="leave-table" *ngIf="!loading && leaves.length > 0">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th *ngIf="user?.role !== 'emp'">ผู้ยื่น</th>
+        <th>ประเภท</th>
+        <th>วันที่</th>
+        <th>สถานะ</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let l of leaves; let i = index">
+        <td>{{ i + 1 }}</td>
+        <td *ngIf="user?.role !== 'emp'">{{ getUserName(l.user_id) }}</td>
+        <td>{{ l.leave_type }}</td>
+        <td>{{ l.start_date }} ~ {{ l.end_date }}</td>
+        <td><app-status-badge [statusCode]="l.current_status"></app-status-badge></td>
+        <td>
+          <button class="btn-sm" [routerLink]="'/leave/' + l.id">ดูรายละเอียด</button>
+          <span class="tag" *ngIf="l.flag_send_back === 'Y'">🔄 ส่งกลับ</span>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="empty" *ngIf="!loading && leaves.length === 0">ไม่มีรายการ</div>
+</div>

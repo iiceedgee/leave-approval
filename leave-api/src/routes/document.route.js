@@ -1,0 +1,49 @@
+const { Router } = require('express');
+const authMiddleware = require('../middleware/auth.middleware');
+const roleMiddleware = require('../middleware/role.middleware');
+
+function handleResult(leave, res) {
+  if (!leave) return res.status(404).json({ message: 'ไม่พบคำขอ' });
+  if (leave.error) return res.status(400).json({ message: leave.error });
+  res.json(leave);
+}
+
+module.exports = function (documentService) {
+  const router = Router();
+  router.use(authMiddleware);
+  router.use(roleMiddleware('mgr', 'hr'));
+
+  router.post('/:id/pretemp/pass', async (req, res) => {
+    const id = req.params.id;
+    const leave = await documentService.pretempPass(id, req.user.id, req.user.role, req.body.remark);
+    handleResult(leave, res);
+  });
+
+  router.post('/:id/pretemp/sendback', async (req, res) => {
+    const id = req.params.id;
+    if (!req.body.remark) return res.status(400).json({ message: 'กรุณาระบุเหตุผลที่ส่งกลับ' });
+    const leave = await documentService.pretempSendBack(id, req.user.id, req.user.role, req.body.remark);
+    handleResult(leave, res);
+  });
+
+  router.post('/:id/temp/pass', async (req, res) => {
+    const id = req.params.id;
+    const leave = await documentService.tempPass(id, req.user.id, req.user.role, req.body.remark);
+    handleResult(leave, res);
+  });
+
+  router.post('/:id/temp/sendback', async (req, res) => {
+    const id = req.params.id;
+    if (!req.body.remark) return res.status(400).json({ message: 'กรุณาระบุเหตุผลที่ส่งกลับ' });
+    const leave = await documentService.tempSendBack(id, req.user.id, req.user.role, req.body.remark);
+    handleResult(leave, res);
+  });
+
+  router.get('/:id/verifications', async (req, res) => {
+    const id = req.params.id;
+    const verifications = await documentService.getVerifications(id);
+    res.json(verifications);
+  });
+
+  return router;
+};

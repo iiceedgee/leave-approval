@@ -1,0 +1,23 @@
+<div class="modal-overlay" *ngIf="visible" (click)="closeModal()">
+  <div class="modal-card" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h4>สถานะทั้งหมด</h4>
+      <button class="close-btn" (click)="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="stepper-detail-timeline" *ngIf="items.length > 0; else emptyTmpl">
+        <div class="stepper-detail-item" *ngFor="let item of items; let i = index">
+          <div class="stepper-detail-marker" [class]="item.state">
+            <div class="stepper-detail-dot"></div>
+            <div class="stepper-detail-line" [style.display]="i === items.length - 1 ? 'none' : ''"></div>
+          </div>
+          <div class="stepper-detail-content" [class]="item.state">
+            <div class="stepper-detail-title">{{ item.name }}</div>
+            <div class="stepper-detail-sub" *ngIf="item.actionBy">{{ item.actionBy }} ({{ item.actionRole }})</div>
+          </div>
+        </div>
+      </div>
+      <ng-template #emptyTmpl><div class="empty-msg">ไม่มีประวัติ</div></ng-template>
+    </div>
+  </div>
+</div>

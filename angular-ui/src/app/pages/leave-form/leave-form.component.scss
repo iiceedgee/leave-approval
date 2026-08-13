@@ -1,0 +1,426 @@
+// ───────────────────────────────────────────────
+//  Design Tokens (no hardcoded values in rules)
+// ───────────────────────────────────────────────
+$color-primary:          #0E3362;
+$color-primary-light:    #e8f0fe;
+$color-text:             #333;
+$color-text-secondary:   #666;
+$color-border:           #ddd;
+$color-border-focus:     $color-primary;
+$color-error:            #c62828;
+$color-error-bg:         #fce4ec;
+$color-success-bg:       #e8f5e9;
+$color-white:            #fff;
+$color-bg:               #f5f7fa;
+$color-badge-bg:         #e8ecf0;
+
+$font-family: 'TA Gameboy', 'Sarabun', 'Noto Sans Thai', 'Tahoma', sans-serif;
+$radius-input:           6px;
+$radius-card:            12px;
+$shadow-card:            0 2px 12px rgba(0, 0, 0, 0.08);
+$transition:             0.2s ease;
+
+// ───────────────────────────────────────────────
+//  Container
+// ───────────────────────────────────────────────
+.leave-form-container {
+  max-width: 680px;
+  margin: 32px auto;
+  padding: 0 20px;
+  font-family: $font-family;
+}
+
+// ───────────────────────────────────────────────
+//  Header
+// ───────────────────────────────────────────────
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 12px;
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    h2 {
+      margin: 0;
+      color: $color-primary;
+      font-size: 22px;
+      font-weight: 600;
+    }
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+}
+
+.btn-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: $color-primary;
+  text-decoration: none;
+  transition: background $transition;
+
+  &:hover {
+    background: $color-primary-light;
+  }
+}
+
+.user-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: $color-badge-bg;
+  border-radius: 20px;
+  font-size: 13px;
+  color: $color-text-secondary;
+  white-space: nowrap;
+}
+
+.btn-logout {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid $color-border;
+  border-radius: $radius-input;
+  background: $color-white;
+  color: $color-text-secondary;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all $transition;
+  font-family: inherit;
+
+  &:hover:not(:disabled) {
+    border-color: $color-error;
+    color: $color-error;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+// ───────────────────────────────────────────────
+//  Resubmit Banner
+// ───────────────────────────────────────────────
+.resubmit-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  background: #fff3e0;
+  border: 1px solid #ffcc80;
+  border-radius: $radius-input;
+  color: #e65100;
+  font-size: 14px;
+}
+
+// ───────────────────────────────────────────────
+//  Form Card
+// ───────────────────────────────────────────────
+.form-card {
+  background: $color-white;
+  border-radius: $radius-card;
+  box-shadow: $shadow-card;
+  padding: 28px 32px;
+}
+
+// ───────────────────────────────────────────────
+//  Section Headers & Dividers
+// ───────────────────────────────────────────────
+.form-section {
+  margin-bottom: 0;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 16px;
+  font-size: 16px;
+  font-weight: 600;
+  color: $color-primary;
+}
+
+.section-divider {
+  height: 1px;
+  background: #eee;
+  margin: 24px 0;
+}
+
+// ───────────────────────────────────────────────
+//  Collapsible Upload Section
+// ───────────────────────────────────────────────
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  &.clickable {
+    cursor: pointer;
+    user-select: none;
+    outline: none;
+
+    &:hover .section-title {
+      opacity: 0.75;
+    }
+
+    &:focus-visible {
+      outline: 2px solid $color-primary;
+      outline-offset: 4px;
+      border-radius: 4px;
+    }
+  }
+}
+
+.section-toggle {
+  color: $color-primary;
+  font-size: 14px;
+  transition: transform $transition;
+}
+
+.upload-body {
+  margin-top: 4px;
+}
+
+.upload-body[hidden] {
+  display: none;
+}
+
+.upload-hint {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: $color-text-secondary;
+  line-height: 1.5;
+
+  i {
+    margin-right: 4px;
+  }
+}
+
+// ───────────────────────────────────────────────
+//  Form Controls
+// ───────────────────────────────────────────────
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 500;
+  color: $color-text;
+  font-size: 14px;
+}
+
+.required {
+  color: $color-error;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1.5px solid $color-border;
+  border-radius: $radius-input;
+  font-size: 14px;
+  box-sizing: border-box;
+  font-family: inherit;
+  background: $color-white;
+  transition: border-color $transition, box-shadow $transition;
+
+  &:focus {
+    outline: none;
+    border-color: $color-border-focus;
+    box-shadow: 0 0 0 3px rgba($color-primary, 0.12);
+  }
+
+  &:disabled {
+    background: #f9f9f9;
+    cursor: not-allowed;
+  }
+
+  &.input-error {
+    border-color: $color-error;
+
+    &:focus {
+      box-shadow: 0 0 0 3px rgba($color-error, 0.12);
+    }
+  }
+}
+
+textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+// ───────────────────────────────────────────────
+//  Form Row (side-by-side fields)
+// ───────────────────────────────────────────────
+.form-row {
+  display: flex;
+  gap: 16px;
+
+  .form-group {
+    flex: 1;
+  }
+}
+
+// ───────────────────────────────────────────────
+//  Validation / Field Errors
+// ───────────────────────────────────────────────
+.field-error {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: $color-error;
+  line-height: 1.4;
+}
+
+.date-error {
+  margin-top: -8px;
+  margin-bottom: 16px;
+}
+
+// ───────────────────────────────────────────────
+//  Action Buttons
+// ───────────────────────────────────────────────
+.form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 24px;
+  font-size: 15px;
+  font-family: inherit;
+  border-radius: $radius-input;
+  cursor: pointer;
+  transition: all $transition;
+  border: 1.5px solid transparent;
+  font-weight: 500;
+  text-decoration: none;
+  line-height: 1;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  i {
+    font-size: 14px;
+  }
+}
+
+.btn-primary {
+  background: $color-primary;
+  color: $color-white;
+
+  &:hover:not(:disabled) {
+    background: #082244;
+  }
+
+  &:active:not(:disabled) {
+    background: #041530;
+  }
+}
+
+.btn-outline {
+  background: $color-white;
+  color: $color-text;
+  border-color: $color-border;
+
+  &:hover:not(:disabled) {
+    border-color: $color-primary;
+    color: $color-primary;
+  }
+
+  &:active:not(:disabled) {
+    background: #f5f5f5;
+  }
+}
+
+// ───────────────────────────────────────────────
+//  Result Message
+// ───────────────────────────────────────────────
+.result-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
+  padding: 12px 16px;
+  border-radius: $radius-input;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.result-success {
+  background: $color-success-bg;
+  color: #2e7d32;
+}
+
+.result-error {
+  background: $color-error-bg;
+  color: $color-error;
+}
+
+// ───────────────────────────────────────────────
+//  Responsive — 600px breakpoint
+// ───────────────────────────────────────────────
+@media (max-width: 600px) {
+  .leave-form-container {
+    margin: 16px auto;
+  }
+
+  .form-card {
+    padding: 20px 16px;
+  }
+
+  .form-row {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .form-actions {
+    flex-direction: column;
+
+    .btn {
+      width: 100%;
+    }
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: stretch;
+
+    .header-left,
+    .header-right {
+      justify-content: center;
+    }
+
+    .header-right {
+      flex-wrap: wrap;
+    }
+  }
+}

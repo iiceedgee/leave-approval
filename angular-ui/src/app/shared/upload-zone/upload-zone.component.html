@@ -1,0 +1,93 @@
+<div class="upload-zone-wrapper">
+  <div
+    class="upload-zone"
+    [class.dragging]="isDragging"
+    role="button"
+    tabindex="0"
+    (click)="fileInput.click()"
+    (keydown.enter)="fileInput.click()"
+    (keydown.space)="fileInput.click(); $event.preventDefault()"
+    (dragover)="onDragOver($event)"
+    (dragleave)="onDragLeave($event)"
+    (drop)="onDrop($event)"
+  >
+    <i class="fa-solid fa-cloud-arrow-up"></i>
+    <p>ลากไฟล์มาวางที่นี่ หรือคลิกเพื่อเลือกไฟล์</p>
+  </div>
+
+  <input
+    #fileInput
+    type="file"
+    [accept]="accept"
+    [multiple]="multiple"
+    (change)="onFileSelect($event)"
+    class="file-input-hidden"
+  />
+
+  <div class="file-list" *ngIf="pendingFiles.length > 0">
+    <div class="file-item" *ngFor="let file of pendingFiles; let i = index">
+      <i class="fa-regular fa-file"></i>
+      <span class="file-name">{{ file.name }}</span>
+      <span class="file-size">{{ formatFileSize(file.size) }}</span>
+      <button type="button" class="file-action-btn" (click)="removePending(i)"
+              [attr.aria-label]="'ลบไฟล์ ' + file.name">✕</button>
+    </div>
+  </div>
+
+  <div class="file-list" *ngIf="existingFileList.length > 0">
+    <div class="file-item" *ngFor="let file of existingFileList">
+      <i class="fa-regular fa-file-lines"></i>
+      <span
+        class="file-name file-download"
+        role="button"
+        tabindex="0"
+        (click)="downloadFile(file.id, file.original_name)"
+        (keydown.enter)="downloadFile(file.id, file.original_name)"
+        (keydown.space)="downloadFile(file.id, file.original_name); $event.preventDefault()"
+        title="ดาวน์โหลด"
+      >
+        {{ file.original_name }}
+      </span>
+      <span class="file-size">
+        {{ formatFileSize(file.file_size || file.size || 0) }}
+      </span>
+      <button
+        type="button"
+        class="file-view-btn"
+        (click)="openPreview(file)"
+        [attr.aria-label]="'ดู ' + file.original_name"
+      >ดู</button>
+      <button
+        type="button"
+        class="file-action-btn"
+        *ngIf="canDeleteFile(file)"
+        (click)="deleteFile(file.id)"
+        [attr.aria-label]="'ลบไฟล์ ' + file.original_name"
+      >✕</button>
+    </div>
+  </div>
+
+  <div class="file-list empty-files" *ngIf="existingFileList.length === 0 && !loading">
+    <p class="empty-text">— ยังไม่มีเอกสาร —</p>
+  </div>
+
+  <div class="action-btns" *ngIf="pendingFiles.length > 0">
+    <button class="btn btn-primary" (click)="uploadAll()" [disabled]="uploading">
+      {{ uploading ? 'กำลังอัปโหลด...' : 'อัปโหลดไฟล์' }}
+    </button>
+  </div>
+
+  <div class="preview-overlay" *ngIf="previewFile" (click)="onOverlayClick($event)">
+    <div class="preview-card" (click)="$event.stopPropagation()">
+      <div class="preview-header">
+        <h4>{{ previewFile.file.original_name }}</h4>
+        <button type="button" class="close-btn" (click)="closePreview()" aria-label="ปิด">✕</button>
+      </div>
+      <div class="preview-body">
+        <iframe *ngIf="previewFile.kind === 'pdf'" [src]="previewFile.safeUrl" title="ตัวอย่างเอกสาร"></iframe>
+        <img *ngIf="previewFile.kind === 'image'" [src]="previewFile.url" alt="ตัวอย่างเอกสาร">
+        <p class="preview-unsupported" *ngIf="previewFile.kind === 'other'">ไฟล์ประเภทนี้ไม่สามารถดูตัวอย่างได้</p>
+      </div>
+    </div>
+  </div>
+</div>

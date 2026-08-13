@@ -1,0 +1,20 @@
+<div class="notification-wrapper" (click)="toggleNotifications($event)">
+  <i class="fa-solid fa-bell"></i>
+  <span class="notification-badge" *ngIf="unreadCount">{{ unreadCount }}</span>
+
+  <div class="notification-card" *ngIf="showNotifications" (click)="$event.stopPropagation()">
+    <div class="notification-header">การแจ้งเตือน</div>
+    <div class="notification-list">
+      <div class="notification-item" *ngFor="let n of notifications" (click)="stampRead(n)">
+        <span class="badge-floating" *ngIf="!n.isRead"></span>
+        <span class="time">{{ n.time | date:'dd/MM/yyyy HH:mm' }}</span>
+        <div class="title">{{ n.title }}</div>
+        <div class="detail">{{ n.detail }}</div>
+        <a class="action-link" *ngIf="n.actionLink" [routerLink]="n.actionLink">รายละเอียด</a>
+      </div>
+      <div class="notification-item" *ngIf="notifications.length === 0">
+        <div class="detail">ไม่มีการแจ้งเตือน</div>
+      </div>
+    </div>
+  </div>
+</div>
