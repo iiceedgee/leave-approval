@@ -73,7 +73,7 @@ class InMemoryStore {
       id: this._uuid(),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-      current_status: 'F',
+      current_status: 'SU',
       flag_send_back: 'N',
       send_back_count: 0,
       ...data,

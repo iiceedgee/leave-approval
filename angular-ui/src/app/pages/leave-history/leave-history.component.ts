@@ -4,6 +4,7 @@ import { forkJoin } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
 import { LeaveService } from '../../services/leave.service';
 import { LeaveBalance, LeaveHistoryItem } from '../../models/leave.model';
+import { STATUS, STATUS_LABELS, getStatusThai } from '../../models/status';
 import { formatThaiDateRange, toBuddhistYear, recentYears } from '../../utils/date-util';
 
 @Component({
@@ -22,13 +23,8 @@ export class LeaveHistoryComponent implements OnInit {
   history: LeaveHistoryItem[] = [];
   loading = true;
   errorMessage = '';
-  filterType = '';
 
-  readonly STATUS_LABELS: Record<string, string> = {
-    F: 'รอดำเนินการ', P: 'รอตรวจสอบเอกสาร', T: 'รอตรวจสอบความถูกต้อง',
-    M: 'รอหัวหน้าอนุมัติ', S: 'อนุมัติแล้ว', B: 'ส่งกลับแก้ไข',
-    C: 'ยกเลิก', U: 'ไม่อนุมัติ',
-  };
+  readonly STATUS_LABELS: Record<string, string> = STATUS_LABELS;
 
   readonly toBuddhistYear = toBuddhistYear;
   readonly formatThaiDateRange = formatThaiDateRange;
@@ -61,20 +57,14 @@ export class LeaveHistoryComponent implements OnInit {
     });
   }
 
-  get filteredHistory(): LeaveHistoryItem[] {
-    return this.filterType
-      ? this.history.filter(h => h.leave_type === this.filterType)
-      : this.history;
-  }
-
   getStatusLabel(code: string): string {
-    return this.STATUS_LABELS[code] || code;
+    return getStatusThai(code);
   }
 
   getStatusClass(code: string): string {
     const map: Record<string, string> = {
-      S: 'status-approved', C: 'status-cancelled', U: 'status-rejected',
-      B: 'status-sendback', F: 'status-pending',
+      AP: 'status-approved', CX: 'status-cancelled', RJ: 'status-rejected',
+      SB: 'status-sendback', SU: 'status-pending',
     };
     return map[code] || 'status-other';
   }
@@ -84,7 +74,7 @@ export class LeaveHistoryComponent implements OnInit {
     return Math.min(100, Math.round((used / quota) * 100));
   }
 
-  viewDetail(id: number): void {
+  viewDetail(id: string): void {
     this.router.navigate(['/leave', id]);
   }
 

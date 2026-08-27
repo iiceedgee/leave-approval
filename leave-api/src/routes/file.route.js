@@ -1,9 +1,12 @@
+'use strict';
+
 const { Router } = require('express');
 const authMiddleware = require('../middleware/auth.middleware');
 const roleMiddleware = require('../middleware/role.middleware');
 const { upload, handleMulterError } = require('../middleware/upload.middleware');
 const path = require('path');
 const { UPLOAD_PATH } = require('../middleware/upload.middleware');
+const { STATUS } = require('../constants/status');
 
 async function canAccessLeave(db, leaveId, user) {
   const leave = await db.getLeaveById(leaveId);
@@ -45,21 +48,22 @@ module.exports = function (fileService) {
 
         let stage = 'emp';
         if (req.user.role !== 'emp') {
-          if (!['P', 'T'].includes(leave.current_status)) {
+          if (![STATUS.DC.code, STATUS.VC.code].includes(leave.current_status)) {
             return res.status(400).json({ message: 'ไม่สามารถอัปโหลดได้ สถานะปัจจุบันไม่อยู่ในการตรวจสอบเอกสาร' });
           }
-          stage = leave.current_status === 'P' ? 'pretemp' : 'temp';
+          stage = leave.current_status === STATUS.DC.code ? 'pretemp' : 'temp';
         }
         const files = [];
         for (const f of req.files) {
+          // รองรับทั้ง diskStorage (มี path/filename) และ memoryStorage (มี buffer) — FileService จะจัดการต่อ
           files.push(await fileService.saveFile(leaveId, req.user.id, f, stage));
         }
 
-        if (leave.current_status === 'F' && req.user.role === 'emp') {
-          await db.updateLeave(leaveId, { current_status: 'P' });
+        if (leave.current_status === STATUS.SU.code && req.user.role === 'emp') {
+          await db.updateLeave(leaveId, { current_status: STATUS.DC.code });
           await db.addHistory({
             leave_request_id: leaveId,
-            status_code: 'P',
+            status_code: STATUS.DC.code,
             action_by: req.user.id,
             action_role: 'emp',
             remark: 'อัปโหลดเอกสารแล้ว',
@@ -90,6 +94,31 @@ module.exports = function (fileService) {
     const fileId = req.params.fileId;
     const file = await fileService.getFile(leaveId, fileId);
     if (!file) return res.status(404).json({ message: 'ไม่พบไฟล์' });
+
+    const isVercel = !!process.env.VERCEL;
+
+    // บน Vercel ไฟล์อยู่บน Supabase Storage — สร้าง signed URL แล้ว redirect
+    if (isVercel) {
+      const supabase = require('../db/supabase');
+      if (supabase) {
+        try {
+          const { data, error } = await supabase.storage
+            .from('leave-documents')
+            .createSignedUrl(file.file_path, 60);
+
+          if (!error && data && data.signedUrl) {
+            return res.redirect(data.signedUrl);
+          }
+          console.error('[file.route] createSignedUrl failed:', error ? error.message : 'no url');
+        } catch (e) {
+          console.error('[file.route] createSignedUrl exception:', e.message);
+        }
+      }
+      // fallback 404 ถ้าไม่มี supabase หรือสร้าง URL ไม่ได้
+      return res.status(404).json({ message: 'ไม่พบไฟล์บนเซิร์ฟเวอร์' });
+    }
+
+    // Local — ส่งไฟล์จาก disk
     const fullPath = path.resolve(UPLOAD_PATH, file.file_path);
 
     if (!fullPath.startsWith(path.resolve(UPLOAD_PATH))) {

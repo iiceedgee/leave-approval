@@ -270,109 +270,6 @@ $transition:             0.2s ease;
 }
 
 // ───────────────────────────────────────────────
-//  Filter Row
-// ───────────────────────────────────────────────
-.filter-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-}
-
-.filter-group {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-
-  label {
-    font-size: 14px;
-    font-weight: 500;
-    color: $color-text;
-    white-space: nowrap;
-  }
-
-  select {
-    padding: 8px 14px;
-    border: 1.5px solid $color-border;
-    border-radius: $radius-input;
-    font-size: 14px;
-    font-family: inherit;
-    color: $color-text;
-    background: $color-white;
-    cursor: pointer;
-    transition: border-color $transition, box-shadow $transition;
-
-    &:focus {
-      outline: none;
-      border-color: $color-border-focus;
-      box-shadow: 0 0 0 3px rgba($color-primary, 0.12);
-    }
-  }
-}
-
-.record-count {
-  font-size: 13px;
-  color: $color-text-secondary;
-}
-
-// ───────────────────────────────────────────────
-//  Table Card
-// ───────────────────────────────────────────────
-.table-card {
-  background: $color-white;
-  border-radius: $radius-card;
-  box-shadow: $shadow-card;
-  overflow-x: auto;
-}
-
-.history-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 14px;
-
-  thead {
-    th {
-      padding: 14px 16px;
-      text-align: left;
-      font-weight: 600;
-      color: $color-text-secondary;
-      background: $color-bg;
-      border-bottom: 1px solid $color-border;
-      white-space: nowrap;
-    }
-
-    .col-center {
-      text-align: center;
-    }
-  }
-
-  tbody {
-    tr {
-      &:nth-child(even) {
-        background: #fafbfc;
-      }
-
-      &:hover {
-        background: $color-primary-light;
-      }
-    }
-
-    td {
-      padding: 12px 16px;
-      color: $color-text;
-      border-bottom: 1px solid #f0f0f0;
-      vertical-align: middle;
-    }
-
-    .col-center {
-      text-align: center;
-    }
-  }
-}
-
-// ───────────────────────────────────────────────
 //  Leave Type Tag
 // ───────────────────────────────────────────────
 .leave-type-tag {
@@ -448,26 +345,6 @@ $transition:             0.2s ease;
 }
 
 // ───────────────────────────────────────────────
-//  Empty State
-// ───────────────────────────────────────────────
-.empty-state {
-  text-align: center;
-  padding: 64px 20px;
-  color: $color-text-secondary;
-
-  i {
-    font-size: 48px;
-    margin-bottom: 16px;
-    display: block;
-  }
-
-  p {
-    font-size: 15px;
-    margin: 0;
-  }
-}
-
-// ───────────────────────────────────────────────
 //  Responsive — 600px breakpoint
 // ───────────────────────────────────────────────
 @media (max-width: 600px) {
@@ -492,22 +369,5 @@ $transition:             0.2s ease;
   .balance-card {
     flex: 1 1 100%;
     min-width: 0;
-  }
-
-  .filter-row {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .filter-group {
-    flex-wrap: wrap;
-  }
-
-  .history-table {
-    thead th,
-    tbody td {
-      padding: 10px 12px;
-      font-size: 13px;
-    }
   }
 }

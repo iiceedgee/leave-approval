@@ -13,14 +13,14 @@ import { ToastService } from '../toast/toast.service';
   styleUrls: ['./upload-zone.component.scss'],
 })
 export class UploadZoneComponent implements OnInit, OnDestroy, OnChanges {
-  @Input() leaveId!: number;
+  @Input() leaveId!: string;
   @Input() accept = '.pdf,.jpg,.jpeg,.png,.docx';
   @Input() multiple = true;
   @Input() maxFiles = 10;
   @Input() maxSizeMB = 10;
   @Input() uploadFn?: (files: File[]) => Observable<any>;
   @Input() getFilesFn?: () => Observable<UploadedFile[]>;
-  @Input() deleteFn?: (fileId: number) => Observable<any>;
+  @Input() deleteFn?: (fileId: string) => Observable<any>;
   @Input() canDelete: boolean | ((file: UploadedFile) => boolean) = true;
   @Output() uploadComplete = new EventEmitter<File[]>();
 
@@ -48,13 +48,13 @@ export class UploadZoneComponent implements OnInit, OnDestroy, OnChanges {
   ) {}
 
   ngOnInit(): void {
-    if (this.leaveId > 0) {
+    if (this.leaveId) {
       this.loadExistingFiles();
     }
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['leaveId'] && this.leaveId > 0 && !changes['leaveId'].firstChange) {
+    if (changes['leaveId'] && this.leaveId && !changes['leaveId'].firstChange) {
       this.loadExistingFiles();
     }
   }
@@ -122,7 +122,7 @@ export class UploadZoneComponent implements OnInit, OnDestroy, OnChanges {
 
   loadExistingFiles(): void {
     this.loading = true;
-    const fn = this.getFilesFn || (() => this.leaveId > 0 ? this.leaveService.getFiles(this.leaveId) : of([]));
+    const fn = this.getFilesFn || (() => this.leaveId ? this.leaveService.getFiles(this.leaveId) : of([]));
     fn().pipe(takeUntil(this.destroy$)).subscribe({
       next: (files) => {
         this.existingFileList = files;
@@ -134,7 +134,7 @@ export class UploadZoneComponent implements OnInit, OnDestroy, OnChanges {
     });
   }
 
-  downloadFile(fileId: number, fileName: string): void {
+  downloadFile(fileId: string, fileName: string): void {
     this.leaveService.downloadFile(this.leaveId, fileId).pipe(takeUntil(this.destroy$)).subscribe({
       next: (blob) => {
         const url = window.URL.createObjectURL(blob);
@@ -220,8 +220,8 @@ export class UploadZoneComponent implements OnInit, OnDestroy, OnChanges {
     return (bytes / 1024).toFixed(1) + ' KB';
   }
 
-  deleteFile(fileId: number): void {
-    const fn = this.deleteFn || ((fid: number) => this.leaveService.deleteFile(this.leaveId, fid));
+  deleteFile(fileId: string): void {
+    const fn = this.deleteFn || ((fid: string) => this.leaveService.deleteFile(this.leaveId, fid));
     fn(fileId).pipe(takeUntil(this.destroy$)).subscribe({
       next: () => {
         this.toast.success('ลบไฟล์เรียบร้อย');

@@ -1,11 +1,13 @@
+import { StatusCode } from './status';
+
 export interface Leave {
-  id: number;
-  user_id: number;
+  id: string;
+  user_id: string;
   leave_type: string;
   start_date: string;
   end_date: string;
   reason: string;
-  current_status: 'F' | 'P' | 'T' | 'M' | 'S' | 'B' | 'C' | 'U';
+  current_status: StatusCode;
   flag_send_back: 'Y' | 'N';
   send_back_count: number;
   created_at: string;
@@ -20,10 +22,10 @@ export interface CreateLeaveRequest {
 }
 
 export interface HistoryItem {
-  id: number;
-  leave_request_id: number;
+  id: string;
+  leave_request_id: string;
   status_code: string;
-  action_by: number;
+  action_by: string;
   action_role: string;
   remark: string;
   created_at: string;
@@ -31,13 +33,13 @@ export interface HistoryItem {
 }
 
 export interface UploadedFile {
-  id: number;
-  leave_request_id: number;
+  id: string;
+  leave_request_id: string;
   original_name: string;
   file_size: number;
   size?: number;
   mime_type: string;
-  uploaded_by: number;
+  uploaded_by: string;
   created_at: string;
 }
 

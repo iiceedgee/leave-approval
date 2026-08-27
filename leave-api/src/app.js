@@ -38,7 +38,12 @@ const auditLogMiddleware = require('./middleware/audit-log.middleware');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
+// CORS: ถ้ามี FRONTEND_URL ให้ล็อค origin ตาม env (production), ถ้าไม่มีให้เปิดทั้งหมด (dev)
+const corsOptions = {
+  origin: process.env.FRONTEND_URL || true,
+  credentials: true,
+};
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // ★ เลือก data layer: มี Supabase จริง → ใช้ SupabaseStore, ไม่งั้นใช้ InMemory
@@ -48,6 +53,7 @@ const db = supabaseClient ? new SupabaseStore(supabaseClient) : new InMemoryStor
 app.use(auditLogMiddleware(db));
 
 // Serve uploads as static files
+// NOTE: /uploads static ใช้ได้แค่ local (diskStorage). บน Vercel ไฟล์อยู่ใน Supabase Storage (memoryStorage) — ไม่ได้เก็บใน filesystem
 const { UPLOAD_PATH } = require('./middleware/upload.middleware');
 app.use('/uploads', express.static(path.resolve(UPLOAD_PATH)));
 
@@ -86,7 +92,8 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(angularDistPath, 'index.html'));
 });
 
-// Start
+// Start — แยกสำหรับ local vs Vercel serverless
+// Vercel จะ import app ผ่าน api/index.js โดยไม่ต้อง listen, local ใช้ node src/app.js ถึงจะ listen
 async function start() {
   await db.seed();
   app.listen(PORT, () => {
@@ -123,4 +130,8 @@ async function start() {
   });
 }
 
-start();
+if (require.main === module) {
+  start();
+}
+
+module.exports = app;

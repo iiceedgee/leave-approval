@@ -2,11 +2,11 @@
 //  Unit Test สำหรับ Stepper Service
 //
 //  Stepper มี 5 ขั้น:
-//  1. ยื่นคำขอ (F)
-//  2. ตรวจสอบเอกสาร (P)
-//  3. หัวหน้าตรวจสอบ (M)
-//  4. HR อนุมัติ (S)
-//  5. เสร็จสิ้น (S)
+//  1. ยื่นคำขอ (SU)
+//  2. ตรวจสอบเอกสาร (DC)
+//  3. หัวหน้าตรวจสอบ (MA)
+//  4. HR อนุมัติ (AP)
+//  5. เสร็จสิ้น (AP)
 //
 //  แต่ละขั้นมี state: current | done | pending | cancelled | rejected
 // =====================================================
@@ -17,9 +17,9 @@ const {
   getStatusThai,
 } = require('../src/services/stepper.service');
 
-describe('getStepperSteps — สถานะ F (ยื่นคำขอ)', () => {
-  it('F → step 1 = current, ที่เหลือ = pending', () => {
-    const steps = getStepperSteps('F', 'N', []);
+describe('getStepperSteps — สถานะ SU (ยื่นคำขอ)', () => {
+  it('SU → step 1 = current, ที่เหลือ = pending', () => {
+    const steps = getStepperSteps('SU', 'N', []);
 
     expect(steps[0].state).toBe('current'); // ยื่นคำขอ
     expect(steps[1].state).toBe('pending'); // ตรวจสอบเอกสาร
@@ -28,17 +28,17 @@ describe('getStepperSteps — สถานะ F (ยื่นคำขอ)', () 
     expect(steps[4].state).toBe('pending'); // เสร็จสิ้น
   });
 
-  it('F + flag_send_back=Y → step 1 = current', () => {
-    const steps = getStepperSteps('F', 'Y', []);
+  it('SU + flag_send_back=Y → step 1 = current', () => {
+    const steps = getStepperSteps('SU', 'Y', []);
 
     expect(steps[0].state).toBe('current');
     expect(steps[1].state).toBe('pending');
   });
 });
 
-describe('getStepperSteps — สถานะ P (รอตรวจสอบเอกสาร)', () => {
-  it('P → step 1 = done, step 2 = current', () => {
-    const steps = getStepperSteps('P', 'N', []);
+describe('getStepperSteps — สถานะ DC (รอตรวจสอบเอกสาร)', () => {
+  it('DC → step 1 = done, step 2 = current', () => {
+    const steps = getStepperSteps('DC', 'N', []);
 
     expect(steps[0].state).toBe('done');    // ยื่นคำขอ
     expect(steps[1].state).toBe('current'); // ตรวจสอบเอกสาร
@@ -46,18 +46,18 @@ describe('getStepperSteps — สถานะ P (รอตรวจสอบเ�
   });
 });
 
-describe('getStepperSteps — สถานะ T (ตรวจสอบความถูกต้อง)', () => {
-  it('T → step 1 = done, step 2 = current', () => {
-    const steps = getStepperSteps('T', 'N', []);
+describe('getStepperSteps — สถานะ VC (ตรวจสอบความถูกต้อง)', () => {
+  it('VC → step 1 = done, step 2 = current', () => {
+    const steps = getStepperSteps('VC', 'N', []);
 
     expect(steps[0].state).toBe('done');
     expect(steps[1].state).toBe('current');
   });
 });
 
-describe('getStepperSteps — สถานะ M (รอหัวหน้าอนุมัติ)', () => {
-  it('M → step 1-2 = done, step 3 = current', () => {
-    const steps = getStepperSteps('M', 'N', []);
+describe('getStepperSteps — สถานะ MA (รอหัวหน้าอนุมัติ)', () => {
+  it('MA → step 1-2 = done, step 3 = current', () => {
+    const steps = getStepperSteps('MA', 'N', []);
 
     expect(steps[0].state).toBe('done');
     expect(steps[1].state).toBe('done');
@@ -67,13 +67,13 @@ describe('getStepperSteps — สถานะ M (รอหัวหน้าอ�
   });
 });
 
-describe('getStepperSteps — สถานะ S (อนุมัติแล้ว)', () => {
-  it('S → step 1-3 = done, step 4-5 = done', () => {
+describe('getStepperSteps — สถานะ AP (อนุมัติแล้ว)', () => {
+  it('AP → step 1-3 = done, step 4-5 = done', () => {
     const history = [
-      { status_code: 'F', action_by_name: 'สมชาย', created_at: '2026-07-27' },
-      { status_code: 'S', action_by_name: 'สมชาย', created_at: '2026-07-28' },
+      { status_code: 'SU', action_by_name: 'สมชาย', created_at: '2026-07-27' },
+      { status_code: 'AP', action_by_name: 'สมชาย', created_at: '2026-07-28' },
     ];
-    const steps = getStepperSteps('S', 'N', history);
+    const steps = getStepperSteps('AP', 'N', history);
 
     expect(steps[0].state).toBe('done');
     expect(steps[1].state).toBe('done');
@@ -83,9 +83,9 @@ describe('getStepperSteps — สถานะ S (อนุมัติแล้�
   });
 });
 
-describe('getStepperSteps — สถานะ C (ยกเลิก)', () => {
-  it('C → step 1 = done, ที่เหลือ = cancelled', () => {
-    const steps = getStepperSteps('C', 'N', []);
+describe('getStepperSteps — สถานะ CX (ยกเลิก)', () => {
+  it('CX → step 1 = done, ที่เหลือ = cancelled', () => {
+    const steps = getStepperSteps('CX', 'N', []);
 
     expect(steps[0].state).toBe('done');
     expect(steps[1].state).toBe('cancelled');
@@ -95,9 +95,9 @@ describe('getStepperSteps — สถานะ C (ยกเลิก)', () => {
   });
 });
 
-describe('getStepperSteps — สถานะ U (ไม่อนุมัติ)', () => {
-  it('U → step 1 = done, ที่เหลือ = rejected', () => {
-    const steps = getStepperSteps('U', 'N', []);
+describe('getStepperSteps — สถานะ RJ (ไม่อนุมัติ)', () => {
+  it('RJ → step 1 = done, ที่เหลือ = rejected', () => {
+    const steps = getStepperSteps('RJ', 'N', []);
 
     expect(steps[0].state).toBe('done');
     expect(steps[1].state).toBe('rejected');
@@ -118,8 +118,8 @@ describe('buildHistoryTimeline', () => {
 
   it('มี 2 history → อันแรก done, อันหลัง current', () => {
     const history = [
-      { status_code: 'F', action_by_name: 'สมชาย', action_role: 'emp', remark: 'ยื่นคำขอ', created_at: '2026-07-27' },
-      { status_code: 'P', action_by_name: 'สมชาย', action_role: 'emp', remark: 'อัปโหลดเอกสาร', created_at: '2026-07-28' },
+      { status_code: 'SU', action_by_name: 'สมชาย', action_role: 'emp', remark: 'ยื่นคำขอ', created_at: '2026-07-27' },
+      { status_code: 'DC', action_by_name: 'สมชาย', action_role: 'emp', remark: 'อัปโหลดเอกสาร', created_at: '2026-07-28' },
     ];
 
     const timeline = buildHistoryTimeline(history);
@@ -132,7 +132,7 @@ describe('buildHistoryTimeline', () => {
 
   it('remark ว่าง → ไม่มี ": " ต่อท้าย', () => {
     const history = [
-      { status_code: 'F', action_by_name: 'สมชาย', action_role: 'emp', remark: '', created_at: '2026-07-27' },
+      { status_code: 'SU', action_by_name: 'สมชาย', action_role: 'emp', remark: '', created_at: '2026-07-27' },
     ];
 
     const timeline = buildHistoryTimeline(history);
@@ -142,24 +142,24 @@ describe('buildHistoryTimeline', () => {
 });
 
 describe('getStatusThai', () => {
-  it('F → "ยื่นคำขอ"', () => {
-    expect(getStatusThai('F')).toBe('ยื่นคำขอ');
+  it('SU → "ยื่นคำขอ"', () => {
+    expect(getStatusThai('SU')).toBe('ยื่นคำขอ');
   });
 
-  it('S → "ผ่านการตรวจสอบ"', () => {
-    expect(getStatusThai('S')).toBe('ผ่านการตรวจสอบ');
+  it('AP → "อนุมัติแล้ว"', () => {
+    expect(getStatusThai('AP')).toBe('อนุมัติแล้ว');
   });
 
-  it('C → "ยกเลิก"', () => {
-    expect(getStatusThai('C')).toBe('ยกเลิก');
+  it('CX → "ยกเลิก"', () => {
+    expect(getStatusThai('CX')).toBe('ยกเลิก');
   });
 
-  it('U → "ไม่อนุมัติ"', () => {
-    expect(getStatusThai('U')).toBe('ไม่อนุมัติ');
+  it('RJ → "ไม่อนุมัติ"', () => {
+    expect(getStatusThai('RJ')).toBe('ไม่อนุมัติ');
   });
 
-  it('B → "ส่งกลับแก้ไข"', () => {
-    expect(getStatusThai('B')).toBe('ส่งกลับแก้ไข');
+  it('SB → "ส่งกลับแก้ไข"', () => {
+    expect(getStatusThai('SB')).toBe('ส่งกลับแก้ไข');
   });
 
   it('รหัสที่ไม่รู้จัก → คืนค่ารหัสเดิม', () => {

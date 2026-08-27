@@ -18,6 +18,7 @@ import { NotificationBellComponent } from './shared/notification-bell/notificati
 import { UploadZoneComponent } from './shared/upload-zone/upload-zone.component';
 import { Dialog } from './common/dialog/dialog';
 import { SweetAlertDialog } from './common/dialog/sweetalert-dialog';
+import { DxDataGridModule } from 'devextreme-angular/ui/data-grid';
 
 import { JwtInterceptor, ErrorInterceptor } from './interceptors';
 import { HTTP_INTERCEPTORS } from '@angular/common/http';
@@ -41,7 +42,8 @@ import { HTTP_INTERCEPTORS } from '@angular/common/http';
     BrowserModule,
     HttpClientModule,
     FormsModule,
-    AppRoutingModule
+    AppRoutingModule,
+    DxDataGridModule
   ],
   providers: [
     { provide: Dialog, useClass: SweetAlertDialog },

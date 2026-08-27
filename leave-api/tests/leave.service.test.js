@@ -2,12 +2,12 @@
 //  Unit Test สำหรับ LeaveService — State Gate
 //
 //  สิ่งที่ test:
-//  1. approve() — ต้อง status M → S, อย่างอื่น → error
-//  2. sendBack() — ต้อง status P/T/M → F, อย่างอื่น → error
-//  3. reject() — ต้อง status T/M → U, อย่างอื่น → error
-//  4. cancel() — ต้อง status F → C, อย่างอื่น → error
+//  1. approve() — ต้อง status MA → AP, อย่างอื่น → error
+//  2. sendBack() — ต้อง status DC/VC/MA → SU, อย่างอื่น → error
+//  3. reject() — ต้อง status VC/MA → RJ, อย่างอื่น → error
+//  4. cancel() — ต้อง status SU → CX, อย่างอื่น → error
 //  5. calcLeaveDays() — คำนวณวันลา
-//  6. Full workflow F→P→T→M→S
+//  6. Full workflow SU→DC→VC→MA→AP
 //
 //  หมายเหตุ: method ใน service เป็น async (เพราะ db อาจเป็น Supabase)
 //  → ทุก test ต้อง await
@@ -39,18 +39,18 @@ describe('LeaveService — approve', () => {
     service = new LeaveService(db);
   });
 
-  it('approve: status M → ควรผ่าน → ได้ S', async () => {
+  it('approve: status MA → ควรผ่าน → ได้ AP', async () => {
     const leave = await createLeave(service);
-    leave.current_status = 'M'; // จำลองว่าผ่าน pretemp+temp แล้ว
+    leave.current_status = 'MA'; // จำลองว่าผ่าน pretemp+temp แล้ว
 
     const result = await service.approve(leave.id, 1, 'mgr', 'เอกสารครบ');
 
-    expect(result.current_status).toBe('S');
+    expect(result.current_status).toBe('AP');
   });
 
-  it('approve: status F → ควร fail → ได้ error', async () => {
+  it('approve: status SU → ควร fail → ได้ error', async () => {
     const leave = await createLeave(service);
-    // leave.current_status === 'F' (default ตอนสร้าง)
+    // leave.current_status === 'SU' (default ตอนสร้าง)
 
     const result = await service.approve(leave.id, 1, 'mgr', '');
 
@@ -58,18 +58,18 @@ describe('LeaveService — approve', () => {
     expect(result.error).toContain('ไม่สามารถอนุมัติ');
   });
 
-  it('approve: status P → ควร fail → ได้ error', async () => {
+  it('approve: status DC → ควร fail → ได้ error', async () => {
     const leave = await createLeave(service);
-    leave.current_status = 'P';
+    leave.current_status = 'DC';
 
     const result = await service.approve(leave.id, 1, 'mgr', '');
 
     expect(result.error).toBeTruthy();
   });
 
-  it('approve: status T → ควร fail → ได้ error', async () => {
+  it('approve: status VC → ควร fail → ได้ error', async () => {
     const leave = await createLeave(service);
-    leave.current_status = 'T';
+    leave.current_status = 'VC';
 
     const result = await service.approve(leave.id, 1, 'mgr', '');
 
@@ -92,46 +92,46 @@ describe('LeaveService — sendBack', () => {
     service = new LeaveService(db);
   });
 
-  it('sendBack: status P → ควรผ่าน → ได้ F + flag_send_back=Y', async () => {
+  it('sendBack: status DC → ควรผ่าน → ได้ SU + flag_send_back=Y', async () => {
     const leave = await createLeave(service);
-    leave.current_status = 'P';
+    leave.current_status = 'DC';
 
     const result = await service.sendBack(leave.id, 1, 'mgr', 'เอกสารไม่ครบ');
 
-    expect(result.current_status).toBe('F');
+    expect(result.current_status).toBe('SU');
     expect(result.flag_send_back).toBe('Y');
   });
 
-  it('sendBack: status T → ควรผ่าน', async () => {
+  it('sendBack: status VC → ควรผ่าน', async () => {
     const leave = await createLeave(service);
-    leave.current_status = 'T';
+    leave.current_status = 'VC';
 
     const result = await service.sendBack(leave.id, 1, 'mgr', 'ข้อมูลไม่ถูกต้อง');
 
-    expect(result.current_status).toBe('F');
+    expect(result.current_status).toBe('SU');
   });
 
-  it('sendBack: status M → ควรผ่าน', async () => {
+  it('sendBack: status MA → ควรผ่าน', async () => {
     const leave = await createLeave(service);
-    leave.current_status = 'M';
+    leave.current_status = 'MA';
 
     const result = await service.sendBack(leave.id, 1, 'mgr', 'ต้องแก้ไข');
 
-    expect(result.current_status).toBe('F');
+    expect(result.current_status).toBe('SU');
   });
 
-  it('sendBack: status F → ควร fail → ได้ error', async () => {
+  it('sendBack: status SU → ควร fail → ได้ error', async () => {
     const leave = await createLeave(service);
-    // leave.current_status === 'F'
+    // leave.current_status === 'SU'
 
     const result = await service.sendBack(leave.id, 1, 'mgr', '');
 
     expect(result.error).toBeTruthy();
   });
 
-  it('sendBack: status S → ควร fail', async () => {
+  it('sendBack: status AP → ควร fail', async () => {
     const leave = await createLeave(service);
-    leave.current_status = 'S';
+    leave.current_status = 'AP';
 
     const result = await service.sendBack(leave.id, 1, 'mgr', '');
 
@@ -148,25 +148,25 @@ describe('LeaveService — reject', () => {
     service = new LeaveService(db);
   });
 
-  it('reject: status T → ควรผ่าน → ได้ U', async () => {
+  it('reject: status VC → ควรผ่าน → ได้ RJ', async () => {
     const leave = await createLeave(service);
-    leave.current_status = 'T';
+    leave.current_status = 'VC';
 
     const result = await service.reject(leave.id, 1, 'mgr', 'ข้อมูลไม่ถูกต้อง');
 
-    expect(result.current_status).toBe('U');
+    expect(result.current_status).toBe('RJ');
   });
 
-  it('reject: status M → ควรผ่าน → ได้ U', async () => {
+  it('reject: status MA → ควรผ่าน → ได้ RJ', async () => {
     const leave = await createLeave(service);
-    leave.current_status = 'M';
+    leave.current_status = 'MA';
 
     const result = await service.reject(leave.id, 1, 'mgr', 'ไม่อนุมัติ');
 
-    expect(result.current_status).toBe('U');
+    expect(result.current_status).toBe('RJ');
   });
 
-  it('reject: status F → ควร fail', async () => {
+  it('reject: status SU → ควร fail', async () => {
     const leave = await createLeave(service);
 
     const result = await service.reject(leave.id, 1, 'mgr', '');
@@ -174,9 +174,9 @@ describe('LeaveService — reject', () => {
     expect(result.error).toBeTruthy();
   });
 
-  it('reject: status P → ควร fail', async () => {
+  it('reject: status DC → ควร fail', async () => {
     const leave = await createLeave(service);
-    leave.current_status = 'P';
+    leave.current_status = 'DC';
 
     const result = await service.reject(leave.id, 1, 'mgr', '');
 
@@ -193,27 +193,27 @@ describe('LeaveService — cancel', () => {
     service = new LeaveService(db);
   });
 
-  it('cancel: status F → ควรผ่าน → ได้ C', async () => {
+  it('cancel: status SU → ควรผ่าน → ได้ CX', async () => {
     const leave = await createLeave(service);
-    // leave.current_status === 'F'
+    // leave.current_status === 'SU'
 
     const result = await service.cancel(leave.id, 1, 'emp', 'เปลี่ยนแผน');
 
-    expect(result.current_status).toBe('C');
+    expect(result.current_status).toBe('CX');
   });
 
-  it('cancel: status M → ควร fail', async () => {
+  it('cancel: status MA → ควร fail', async () => {
     const leave = await createLeave(service);
-    leave.current_status = 'M';
+    leave.current_status = 'MA';
 
     const result = await service.cancel(leave.id, 1, 'emp', '');
 
     expect(result.error).toBeTruthy();
   });
 
-  it('cancel: status P → ควร fail', async () => {
+  it('cancel: status DC → ควร fail', async () => {
     const leave = await createLeave(service);
-    leave.current_status = 'P';
+    leave.current_status = 'DC';
 
     const result = await service.cancel(leave.id, 1, 'emp', '');
 
@@ -239,7 +239,7 @@ describe('calcLeaveDays', () => {
   });
 });
 
-describe('Full Workflow — F → P → T → M → S', () => {
+describe('Full Workflow — SU → DC → VC → MA → AP', () => {
   let service;
   let db;
 
@@ -248,27 +248,27 @@ describe('Full Workflow — F → P → T → M → S', () => {
     service = new LeaveService(db);
   });
 
-  it('สร้าง → F → P → T → M → S: approve ต้อง fail จนกว่าถึง M', async () => {
+  it('สร้าง → SU → DC → VC → MA → AP: approve ต้อง fail จนกว่าถึง MA', async () => {
     const leave = await createLeave(service);
 
-    // สร้าง → status F
-    expect(leave.current_status).toBe('F');
+    // สร้าง → status SU
+    expect(leave.current_status).toBe('SU');
 
-    // F → approve ไม่ได้
+    // SU → approve ไม่ได้
     expect((await service.approve(leave.id, 1, 'mgr', '')).error).toBeTruthy();
 
-    // อัปโหลดเอกสาร → status P
-    leave.current_status = 'P';
+    // อัปโหลดเอกสาร → status DC
+    leave.current_status = 'DC';
     expect((await service.approve(leave.id, 1, 'mgr', '')).error).toBeTruthy();
 
-    // Pretemp Pass → status T
-    leave.current_status = 'T';
+    // Pretemp Pass → status VC
+    leave.current_status = 'VC';
     expect((await service.approve(leave.id, 1, 'mgr', '')).error).toBeTruthy();
 
-    // Temp Pass → status M
-    leave.current_status = 'M';
-    // M → approve ได้!
+    // Temp Pass → status MA
+    leave.current_status = 'MA';
+    // MA → approve ได้!
     const result = await service.approve(leave.id, 1, 'mgr', 'อนุมัติ');
-    expect(result.current_status).toBe('S');
+    expect(result.current_status).toBe('AP');
   });
 });

@@ -50,18 +50,12 @@ a { text-decoration: none; color: $primary; }
 // Badge
 .badge { background: #e8eaf6; padding: 6px 12px; border-radius: 4px; font-size: 13px; color: $primary; }
 
-// Table
-.leave-table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.1); }
-.leave-table th { background: $primary; color: white; padding: 12px 16px; text-align: left; font-weight: 500; }
-.leave-table td { padding: 12px 16px; border-bottom: 1px solid #eee; }
-.leave-table tr:hover td { background: #f5f7fa; }
-
 // Status badges
 .status-badge { padding: 4px 10px; border-radius: 12px; font-size: 12px; }
-.status-F { background: #fff3e0; color: $warning; }
-.status-S { background: #e8f5e9; color: $success; }
-.status-B { background: #e3f2fd; color: $sendback; }
-.status-C, .status-U { background: #fce4ec; color: $danger; }
+.status-SU { background: #fff3e0; color: $warning; }
+.status-AP { background: #e8f5e9; color: $success; }
+.status-SB { background: #e3f2fd; color: $sendback; }
+.status-CX, .status-RJ { background: #fce4ec; color: $danger; }
 
 // Empty state
 .empty { text-align: center; padding: 40px; color: #999; }

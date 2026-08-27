@@ -1,23 +1,32 @@
+/**
+ * Stepper Service — centralized status via ../constants/status
+ * แทน cms_status ของ EEC แบบ in-code ไม่ต้อง JOIN
+ * STATUS กลางอยู่ที่ leave-api/src/constants/status.js
+ */
+'use strict';
+
+const { STATUS, getStatusThai } = require('../constants/status');
+
 const STEPPER_STEPS = [
-  { seq: 1, icon: 'fa-solid fa-file-pen',    name: 'ยื่นคำขอ',          status: 'F' },
-  { seq: 2, icon: 'fa-solid fa-file-shield',  name: 'ตรวจสอบเอกสาร',     status: 'P' },
-  { seq: 3, icon: 'fa-solid fa-user-check',   name: 'หัวหน้าตรวจสอบ',    status: 'M' },
-  { seq: 4, icon: 'fa-solid fa-building',     name: 'HR อนุมัติ',         status: 'S' },
-  { seq: 5, icon: 'fa-solid fa-circle-check', name: 'เสร็จสิ้น',          status: 'S' },
+  { seq: 1, icon: 'fa-solid fa-file-pen',    name: 'ยื่นคำขอ',       status: STATUS.SU.code },
+  { seq: 2, icon: 'fa-solid fa-file-shield',  name: 'ตรวจสอบเอกสาร',  status: STATUS.DC.code },
+  { seq: 3, icon: 'fa-solid fa-user-check',   name: 'หัวหน้าตรวจสอบ', status: STATUS.MA.code },
+  { seq: 4, icon: 'fa-solid fa-building',     name: 'HR อนุมัติ',      status: STATUS.AP.code },
+  { seq: 5, icon: 'fa-solid fa-circle-check', name: 'เสร็จสิ้น',       status: STATUS.AP.code },
 ];
 
 function getCurrentStepIndex(currentStatus, flagSendBack) {
-  if (currentStatus === 'C' || currentStatus === 'U') {
+  if (currentStatus === STATUS.CX.code || currentStatus === STATUS.RJ.code) {
     return -1;
   }
   if (flagSendBack === 'Y') {
     return 0;
   }
-  if (currentStatus === 'F') return 0;
-  if (currentStatus === 'P') return 1;
-  if (currentStatus === 'T') return 1;
-  if (currentStatus === 'M') return 2;
-  if (currentStatus === 'S') return -1;
+  if (currentStatus === STATUS.SU.code) return 0;
+  if (currentStatus === STATUS.DC.code) return 1;
+  if (currentStatus === STATUS.VC.code) return 1;
+  if (currentStatus === STATUS.MA.code) return 2;
+  if (currentStatus === STATUS.AP.code) return -1;
   return -1;
 }
 
@@ -27,38 +36,38 @@ function getStepperSteps(currentStatus, flagSendBack, history, role) {
   let lastApprovedIndex = -1;
   if (history && history.length > 0) {
     for (let i = history.length - 1; i >= 0; i--) {
-      if (history[i].status_code === 'S') {
-        const stepIdx = STEPPER_STEPS.findIndex(s => s.status === 'S');
+      if (history[i].status_code === STATUS.AP.code) {
+        const stepIdx = STEPPER_STEPS.findIndex(s => s.status === STATUS.AP.code);
         lastApprovedIndex = Math.max(lastApprovedIndex, stepIdx);
       }
     }
   }
 
   const stepState = (step, index) => {
-    if (currentStatus === 'C') return index <= 0 ? 'done' : 'cancelled';
-    if (currentStatus === 'U') return index <= 0 ? 'done' : 'rejected';
+    if (currentStatus === STATUS.CX.code) return index <= 0 ? 'done' : 'cancelled';
+    if (currentStatus === STATUS.RJ.code) return index <= 0 ? 'done' : 'rejected';
     if (flagSendBack === 'Y' && index === 0) return 'current';
     if (flagSendBack === 'Y') return 'pending';
 
-    if (currentStatus === 'F') {
+    if (currentStatus === STATUS.SU.code) {
       if (index === 0) return 'current';
       return 'pending';
     }
 
-    if (currentStatus === 'P' || currentStatus === 'T') {
+    if (currentStatus === STATUS.DC.code || currentStatus === STATUS.VC.code) {
       if (index === 0) return 'done';
       if (index === 1) return 'current';
       return 'pending';
     }
 
-    if (currentStatus === 'M') {
+    if (currentStatus === STATUS.MA.code) {
       if (index === 0) return 'done';
       if (index === 1) return 'done';
       if (index === 2) return 'current';
       return 'pending';
     }
 
-    if (currentStatus === 'S') {
+    if (currentStatus === STATUS.AP.code) {
       if (index <= 3) return 'done';
       if (index === 4) return 'done';
       return 'pending';
@@ -90,20 +99,6 @@ function buildHistoryTimeline(history) {
   }));
 }
 
-function getStatusThai(code) {
-  const map = {
-    'F': 'ยื่นคำขอ',
-    'P': 'รอตรวจสอบเอกสาร',
-    'T': 'ตรวจสอบความถูกต้อง',
-    'M': 'หัวหน้าอนุมัติ',
-    'S': 'ผ่านการตรวจสอบ',
-    'B': 'ส่งกลับแก้ไข',
-    'C': 'ยกเลิก',
-    'U': 'ไม่อนุมัติ',
-  };
-  return map[code] || code;
-}
-
 function getApprovableSteps(role) {
   if (role === 'mgr') return ['หัวหน้าตรวจสอบ'];
   if (role === 'hr') return ['HR อนุมัติ'];
@@ -116,4 +111,5 @@ module.exports = {
   buildHistoryTimeline,
   getStatusThai,
   getApprovableSteps,
+  getCurrentStepIndex,
 };

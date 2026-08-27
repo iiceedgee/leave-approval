@@ -57,53 +57,49 @@
     </div>
   </div>
 
-  <!-- Filter -->
-  <div class="filter-row" *ngIf="!loading">
-    <div class="filter-group">
-      <label for="typeFilter">กรองตามประเภท</label>
-      <select id="typeFilter" [(ngModel)]="filterType">
-        <option value="">ทั้งหมด</option>
-        <option *ngFor="let b of balances" [value]="b.leave_type">{{ b.leave_type }}</option>
-      </select>
-    </div>
-    <span class="record-count">ทั้งหมด {{ filteredHistory.length }} รายการ</span>
-  </div>
+  <!-- History Grid -->
+  <dx-data-grid *ngIf="!loading" [dataSource]="history" [showBorders]="true" [columnAutoWidth]="true"
+    [rowAlternationEnabled]="true" [hoverStateEnabled]="true" noDataText="ไม่มีประวัติการลาในปีนี้">
+    <dxo-paging [pageSize]="10"></dxo-paging>
+    <dxo-editing [allowAdding]="false" [allowDeleting]="false" [allowUpdating]="false"></dxo-editing>
+    <dxo-pager [showPageSizeSelector]="true" [allowedPageSizes]="[10, 20, 50]" [showInfo]="true"
+      [showNavigationButtons]="true"></dxo-pager>
+    <dxo-sorting mode="single"></dxo-sorting>
+    <dxo-search-panel [visible]="true" [width]="240" placeholder="ค้นหา..."></dxo-search-panel>
+    <dxo-filter-row [visible]="true"></dxo-filter-row>
 
-  <!-- History Table -->
-  <div class="table-card" *ngIf="!loading && filteredHistory.length > 0">
-    <table class="history-table">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>ประเภท</th>
-          <th>วันที่</th>
-          <th class="col-center">จำนวนวัน</th>
-          <th>สถานะ</th>
-          <th class="col-center"></th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let item of filteredHistory; let i = index">
-          <td>{{ i + 1 }}</td>
-          <td><span class="leave-type-tag">{{ item.leave_type }}</span></td>
-          <td>{{ formatThaiDateRange(item.start_date, item.end_date) }}</td>
-          <td class="col-center">{{ item.used_days }}</td>
-          <td>
-            <span class="status-tag" [ngClass]="getStatusClass(item.current_status)">
-              {{ getStatusLabel(item.current_status) }}
-            </span>
-          </td>
-          <td class="col-center">
-            <button class="btn-sm" (click)="viewDetail(item.id)">ดู</button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
+    <dxi-column [width]="60" caption="#" alignment="center" cellTemplate="rowNumTemplate">
+      <div *dxTemplate="let cell of 'rowNumTemplate'">
+        {{ cell.component.pageIndex() * cell.component.pageSize() + cell.rowIndex + 1 }}
+      </div>
+    </dxi-column>
 
-  <!-- Empty state -->
-  <div class="empty-state" *ngIf="!loading && filteredHistory.length === 0">
-    <i class="fa-regular fa-calendar-xmark"></i>
-    <p>ไม่มีประวัติการลาในปีนี้</p>
-  </div>
+    <dxi-column dataField="leave_type" caption="ประเภท" cellTemplate="typeTemplate">
+      <div *dxTemplate="let data of 'typeTemplate'">
+        <span class="leave-type-tag">{{ data.data.leave_type }}</span>
+      </div>
+    </dxi-column>
+
+    <dxi-column caption="วันที่" cellTemplate="dateTemplate">
+      <div *dxTemplate="let data of 'dateTemplate'">
+        {{ formatThaiDateRange(data.data.start_date, data.data.end_date) }}
+      </div>
+    </dxi-column>
+
+    <dxi-column dataField="used_days" caption="จำนวนวัน" alignment="center" dataType="number"></dxi-column>
+
+    <dxi-column dataField="current_status" caption="สถานะ" cellTemplate="statusTemplate">
+      <div *dxTemplate="let data of 'statusTemplate'">
+        <span class="status-tag" [ngClass]="getStatusClass(data.data.current_status)">
+          {{ getStatusLabel(data.data.current_status) }}
+        </span>
+      </div>
+    </dxi-column>
+
+    <dxi-column caption="" alignment="center" [width]="90" cellTemplate="detailTemplate">
+      <div *dxTemplate="let data of 'detailTemplate'">
+        <button class="btn-sm" (click)="viewDetail(data.data.id)">ดู</button>
+      </div>
+    </dxi-column>
+  </dx-data-grid>
 </div>

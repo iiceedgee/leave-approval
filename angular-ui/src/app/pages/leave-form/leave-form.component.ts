@@ -17,8 +17,8 @@ export class LeaveFormComponent implements OnInit, OnDestroy {
   @ViewChild('uploadZone') uploadZone!: UploadZoneComponent;
 
   isResubmit = false;
-  resubmitId: number | null = null;
-  tempLeaveId: number | null = null;
+  resubmitId: string | null = null;
+  tempLeaveId: string | null = null;
   isSubmitting = false;
   showUploadSection = false;
 
@@ -48,11 +48,11 @@ export class LeaveFormComponent implements OnInit, OnDestroy {
   };
 
   /** Computed leave ID to pass to the upload-zone component. */
-  get uploadLeaveId(): number {
+  get uploadLeaveId(): string {
     if (this.isResubmit && this.resubmitId !== null) {
       return this.resubmitId;
     }
-    return this.tempLeaveId || 0;
+    return this.tempLeaveId || '';
   }
 
   constructor(
@@ -66,7 +66,7 @@ export class LeaveFormComponent implements OnInit, OnDestroy {
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
       this.isResubmit = true;
-      this.resubmitId = +id;
+      this.resubmitId = id;
       this.tempLeaveId = this.resubmitId;
       this.showUploadSection = true;
       this.leaveService.getLeave(this.resubmitId).pipe(

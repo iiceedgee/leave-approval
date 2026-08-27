@@ -1,5 +1,8 @@
+'use strict';
+
 const stepperService = require('./stepper.service');
 const leaveQuota = require('../config/leave-quota');
+const { STATUS } = require('../constants/status');
 
 class LeaveService {
   constructor(db) {
@@ -9,7 +12,7 @@ class LeaveService {
     this.db = db;
   }
 
-  // พนักงานยื่นคำขอลา → status = F
+  // พนักงานยื่นคำขอลา → status = SU
   async create(userId, data) {
     const leave = await this.db.createLeave({
       user_id: userId,
@@ -22,7 +25,7 @@ class LeaveService {
     // บันทึก history
     await this.db.addHistory({
       leave_request_id: leave.id,
-      status_code: 'F',
+      status_code: STATUS.SU.code,
       action_by: userId,
       action_role: 'emp',
       remark: 'ยื่นคำขอลา',
@@ -35,47 +38,54 @@ class LeaveService {
   async getLeaves(userId, role) {
     const allLeaves = await this.db.listLeaves();
     const allUsers = await this.db.listUsers();
+    const nameMap = new Map(allUsers.map(u => [u.id, u.full_name]));
 
-    if (role === 'hr') return allLeaves;
-    if (role === 'mgr') {
+    let leaves;
+    if (role === 'hr') {
+      leaves = allLeaves;
+    } else if (role === 'mgr') {
       // manager เห็น leaves ของ employees ใน department เดียวกัน
       const mgr = allUsers.find(u => u.id === userId);
-      return allLeaves.filter(l => {
+      leaves = allLeaves.filter(l => {
         const u = allUsers.find(x => x.id === l.user_id);
         return u && u.department === mgr.department;
       });
+    } else {
+      // employee เห็นเฉพาะของตัวเอง
+      leaves = allLeaves.filter(l => l.user_id === userId);
     }
-    // employee เห็นเฉพาะของตัวเอง
-    return allLeaves.filter(l => l.user_id === userId);
+
+    // เพิ่มชื่อเจ้าของคำขอ (owner_name) ให้ทุกรายการ — ใช้กับหน้า dashboard
+    return leaves.map(l => ({ ...l, owner_name: nameMap.get(l.user_id) || l.user_id }));
   }
 
   async getById(id) {
     return this.db.getLeaveById(id);
   }
 
-  // ★ อนุมัติ — ต้อง status M (หลังตรวจเอกสารผ่าน) → set S
+  // ★ อนุมัติ — ต้อง status MA (หลังตรวจเอกสารผ่าน) → set AP
   async approve(leaveId, userId, role, remark) {
     const leave = await this.db.getLeaveById(leaveId);
     if (!leave) return { error: 'ไม่พบคำขอ' };
-    if (leave.current_status !== 'M') return { error: 'ไม่สามารถอนุมัติได้ สถานะปัจจุบันไม่ใช่รอหัวหน้าตรวจสอบ (M)' };
-    return this.transition(leaveId, userId, role, 'S', remark);
+    if (leave.current_status !== STATUS.MA.code) return { error: 'ไม่สามารถอนุมัติได้ สถานะปัจจุบันไม่ใช่รอหัวหน้าตรวจสอบ (MA)' };
+    return this.transition(leaveId, userId, role, STATUS.AP.code, remark);
   }
 
-  // ★ ส่งกลับแก้ไข — เฉพาะ status P/T/M
+  // ★ ส่งกลับแก้ไข — เฉพาะ status DC/VC/MA
   async sendBack(leaveId, userId, role, remark) {
     const leave = await this.db.getLeaveById(leaveId);
     if (!leave) return { error: 'ไม่พบคำขอ' };
-    if (!['P', 'T', 'M'].includes(leave.current_status)) return { error: 'ไม่สามารถส่งกลับได้ สถานะปัจจุบันไม่รอการตรวจสอบ (P/T/M)' };
+    if (![STATUS.DC.code, STATUS.VC.code, STATUS.MA.code].includes(leave.current_status)) return { error: 'ไม่สามารถส่งกลับได้ สถานะปัจจุบันไม่รอการตรวจสอบ (DC/VC/MA)' };
 
     const updated = await this.db.updateLeave(leaveId, {
-      current_status: 'F',
+      current_status: STATUS.SU.code,
       flag_send_back: 'Y',
       send_back_count: (leave.send_back_count || 0) + 1,
     });
 
     await this.db.addHistory({
       leave_request_id: leaveId,
-      status_code: 'B',
+      status_code: STATUS.SB.code,
       action_by: userId,
       action_role: role,
       remark: remark || 'ส่งกลับแก้ไข',
@@ -84,20 +94,20 @@ class LeaveService {
     return updated;
   }
 
-  // ★ ไม่อนุมัติ — เฉพาะ status T/M
+  // ★ ไม่อนุมัติ — เฉพาะ status VC/MA
   async reject(leaveId, userId, role, remark) {
     const leave = await this.db.getLeaveById(leaveId);
     if (!leave) return { error: 'ไม่พบคำขอ' };
-    if (!['T', 'M'].includes(leave.current_status)) return { error: 'ไม่สามารถไม่อนุมัติได้ สถานะปัจจุบันไม่ใช่รอตรวจสอบหรือรอหัวหน้าตรวจสอบ (T/M)' };
-    return this.transition(leaveId, userId, role, 'U', remark);
+    if (![STATUS.VC.code, STATUS.MA.code].includes(leave.current_status)) return { error: 'ไม่สามารถไม่อนุมัติได้ สถานะปัจจุบันไม่ใช่รอตรวจสอบหรือรอหัวหน้าตรวจสอบ (VC/MA)' };
+    return this.transition(leaveId, userId, role, STATUS.RJ.code, remark);
   }
 
-  // ★ ยกเลิก — เฉพาะ status F
+  // ★ ยกเลิก — เฉพาะ status SU
   async cancel(leaveId, userId, role, remark) {
     const leave = await this.db.getLeaveById(leaveId);
     if (!leave) return { error: 'ไม่พบคำขอ' };
-    if (leave.current_status !== 'F') return { error: 'ไม่สามารถยกเลิกได้ สถานะปัจจุบันไม่ใช่รอดำเนินการ (F)' };
-    return this.transition(leaveId, userId, role, 'C', remark);
+    if (leave.current_status !== STATUS.SU.code) return { error: 'ไม่สามารถยกเลิกได้ สถานะปัจจุบันไม่ใช่รอดำเนินการ (SU)' };
+    return this.transition(leaveId, userId, role, STATUS.CX.code, remark);
   }
 
   // แก้ไขหลังจากถูกส่งกลับ (flag_send_back → N)
@@ -107,7 +117,7 @@ class LeaveService {
     if (leave.user_id !== userId) return null;
     if (leave.flag_send_back !== 'Y') return null;
 
-    const updateFields = { current_status: 'P', flag_send_back: 'N' };
+    const updateFields = { current_status: STATUS.DC.code, flag_send_back: 'N' };
     if (data.leave_type) updateFields.leave_type = data.leave_type;
     if (data.start_date) updateFields.start_date = data.start_date;
     if (data.end_date) updateFields.end_date = data.end_date;
@@ -117,7 +127,7 @@ class LeaveService {
 
     await this.db.addHistory({
       leave_request_id: leaveId,
-      status_code: 'P',
+      status_code: STATUS.DC.code,
       action_by: userId,
       action_role: 'emp',
       remark: 'ส่งคำขออีกครั้งหลังจากแก้ไข',
@@ -147,7 +157,7 @@ class LeaveService {
   // ★ ดึง stepper steps
   async getStepper(leaveId) {
     const leave = await this.db.getLeaveById(leaveId);
-    if (!leave) return stepperService.getStepperSteps('F', 'N', []);
+    if (!leave) return stepperService.getStepperSteps(STATUS.SU.code, 'N', []);
 
     const history = await this.db.listHistoryByLeave(leaveId);
     return stepperService.getStepperSteps(leave.current_status, leave.flag_send_back, history);
@@ -200,7 +210,7 @@ class LeaveService {
     const allLeaves = await this.db.listLeaves();
     const approvedLeaves = allLeaves.filter(l =>
       l.user_id === userId
-      && l.current_status === 'S'
+      && l.current_status === STATUS.AP.code
       && new Date(l.start_date).getFullYear() === targetYear
     );
 

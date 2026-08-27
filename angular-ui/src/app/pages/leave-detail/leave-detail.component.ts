@@ -8,6 +8,7 @@ import { ToastService } from '../../shared/toast/toast.service';
 import { showDialog, showConfirmDialog } from '../../common/dialog/dialog';
 import { Leave, UploadedFile } from '../../models/leave.model';
 import { StepperStep, TimelineItem } from '../../models/stepper.model';
+import { STATUS } from '../../models/status';
 
 @Component({
   standalone: false,
@@ -40,7 +41,7 @@ export class LeaveDetailComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.user = this.auth.getUser();
-    const id = +this.route.snapshot.paramMap.get('id')!;
+    const id = this.route.snapshot.paramMap.get('id')!;
     this.loadData(id);
   }
 
@@ -54,7 +55,7 @@ export class LeaveDetailComponent implements OnInit, OnDestroy {
     }));
   }
 
-  private loadData(id: number): void {
+  private loadData(id: string): void {
     this.loading = true;
     this.leaveService.getLeave(id).pipe(takeUntil(this.destroy$)).subscribe({
       next: (leave) => {
@@ -80,31 +81,31 @@ export class LeaveDetailComponent implements OnInit, OnDestroy {
   }
 
   get canApprove(): boolean {
-    return this.user?.role === 'mgr' && this.leave?.current_status === 'M';
+    return this.user?.role === 'mgr' && this.leave?.current_status === STATUS.MA.code;
   }
 
   get canDoPretemp(): boolean {
-    return (this.user?.role === 'mgr' || this.user?.role === 'hr') && this.leave?.current_status === 'P';
+    return (this.user?.role === 'mgr' || this.user?.role === 'hr') && this.leave?.current_status === STATUS.DC.code;
   }
 
   get canDoTemp(): boolean {
-    return (this.user?.role === 'mgr' || this.user?.role === 'hr') && this.leave?.current_status === 'T';
+    return (this.user?.role === 'mgr' || this.user?.role === 'hr') && this.leave?.current_status === STATUS.VC.code;
   }
 
   get canSendBack(): boolean {
     return (this.user?.role === 'mgr' || this.user?.role === 'hr') &&
-      (this.leave?.current_status === 'P' || this.leave?.current_status === 'T' || this.leave?.current_status === 'M');
+      (this.leave?.current_status === STATUS.DC.code || this.leave?.current_status === STATUS.VC.code || this.leave?.current_status === STATUS.MA.code);
   }
 
   get canReject(): boolean {
     return (this.user?.role === 'mgr' || this.user?.role === 'hr') &&
-      (this.leave?.current_status === 'T' || this.leave?.current_status === 'M');
+      (this.leave?.current_status === STATUS.VC.code || this.leave?.current_status === STATUS.MA.code);
   }
 
   get canCancel(): boolean {
     return this.user?.role === 'emp' &&
       this.user?.id === this.leave?.user_id &&
-      this.leave?.current_status === 'F';
+      this.leave?.current_status === STATUS.SU.code;
   }
 
   get canResubmit(): boolean {
@@ -116,7 +117,7 @@ export class LeaveDetailComponent implements OnInit, OnDestroy {
   get canUploadDoc(): boolean {
     return this.user?.role === 'emp' &&
       this.user?.id === this.leave?.user_id &&
-      (this.leave?.current_status === 'F' || this.leave?.flag_send_back === 'Y');
+      (this.leave?.current_status === STATUS.SU.code || this.leave?.flag_send_back === 'Y');
   }
 
   get showApprovalPanel(): boolean {
@@ -125,7 +126,7 @@ export class LeaveDetailComponent implements OnInit, OnDestroy {
 
   private async guardHrBlockedAtM(): Promise<boolean> {
     if (this.user?.role !== 'hr') return false;
-    if (this.leave?.current_status === 'M') {
+    if (this.leave?.current_status === STATUS.MA.code) {
       await showDialog({
         type: 'warning',
         title: 'ไม่สามารถดำเนินการได้',
@@ -313,7 +314,7 @@ export class LeaveDetailComponent implements OnInit, OnDestroy {
     return this.leaveService.uploadFile(this.leave!.id, files);
   }
 
-  onEmpDelete(fileId: number): any {
+  onEmpDelete(fileId: string): any {
     return this.leaveService.deleteFile(this.leave!.id, fileId);
   }
 

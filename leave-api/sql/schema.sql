@@ -2,6 +2,10 @@
 -- Leave Approval System — Database Schema
 -- รันใน Supabase SQL Editor ก่อนเริ่มใช้งาน
 -- ============================================================
+-- หมายเหตุ: STATUS กลางอยู่ที่ leave-api/src/constants/status.js
+-- ไฟล์ status.js แทนตาราง cms_status ของระบบ EEC แบบ in-code ไม่ต้อง JOIN
+-- ไม่สร้างตาราง cms_status จริง — ใช้ CHECK + constants แทน เพื่อลดความซับซ้อน
+-- ============================================================
 
 -- 1. ตาราง users
 CREATE TABLE users (
@@ -23,7 +27,7 @@ CREATE TABLE leave_requests (
   start_date DATE NOT NULL,
   end_date DATE NOT NULL,
   reason TEXT,
-  current_status CHAR(1) DEFAULT 'F' CHECK (current_status IN ('F','P','T','M','S','B','C','U')),
+  current_status VARCHAR(2) DEFAULT 'SU' CHECK (current_status IN ('SU','DC','VC','MA','AP','SB','CX','RJ')),
   flag_send_back CHAR(1) DEFAULT 'N' CHECK (flag_send_back IN ('Y','N')),
   send_back_count INT DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT now(),
@@ -34,7 +38,7 @@ CREATE TABLE leave_requests (
 CREATE TABLE leave_status_history (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   leave_request_id UUID NOT NULL REFERENCES leave_requests(id),
-  status_code CHAR(1) NOT NULL,            -- F/P/T/M/S/B/C/U
+  status_code VARCHAR(2) NOT NULL,            -- SU=Submitted(ยื่นคำขอ)->DC, DC=DocCheck(pretemp:ตรวจสอบครบถ้วน)->VC/SU, VC=VerifyCheck(temp:ตรวจสอบถูกต้อง)->MA/SU, MA=ManagerApproval(รอหัวหน้าอนุมัติ)->AP/SB/RJ, AP=Approved, SB=SendBack, CX=Cancelled, RJ=Rejected
   action_by UUID NOT NULL REFERENCES users(id),
   action_role VARCHAR(10),                 -- emp / mgr / hr
   remark TEXT,

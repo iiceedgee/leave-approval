@@ -17,31 +17,46 @@
 
   <div class="loading" *ngIf="loading">กำลังโหลด...</div>
 
-  <table class="leave-table" *ngIf="!loading && leaves.length > 0">
-    <thead>
-      <tr>
-        <th>#</th>
-        <th *ngIf="user?.role !== 'emp'">ผู้ยื่น</th>
-        <th>ประเภท</th>
-        <th>วันที่</th>
-        <th>สถานะ</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr *ngFor="let l of leaves; let i = index">
-        <td>{{ i + 1 }}</td>
-        <td *ngIf="user?.role !== 'emp'">{{ getUserName(l.user_id) }}</td>
-        <td>{{ l.leave_type }}</td>
-        <td>{{ l.start_date }} ~ {{ l.end_date }}</td>
-        <td><app-status-badge [statusCode]="l.current_status"></app-status-badge></td>
-        <td>
-          <button class="btn-sm" [routerLink]="'/leave/' + l.id">ดูรายละเอียด</button>
-          <span class="tag" *ngIf="l.flag_send_back === 'Y'">🔄 ส่งกลับ</span>
-        </td>
-      </tr>
-    </tbody>
-  </table>
+  <dx-data-grid *ngIf="!loading" [dataSource]="leaves" [showBorders]="true" [columnAutoWidth]="true"
+    [rowAlternationEnabled]="true" [hoverStateEnabled]="true" noDataText="ไม่มีรายการ">
+    <dxo-paging [pageSize]="10"></dxo-paging>
+    <dxo-editing [allowAdding]="false" [allowDeleting]="false" [allowUpdating]="false"></dxo-editing>
+    <dxo-pager [showPageSizeSelector]="true" [allowedPageSizes]="[10, 20, 50]" [showInfo]="true"
+      [showNavigationButtons]="true"></dxo-pager>
+    <dxo-sorting mode="single"></dxo-sorting>
+    <dxo-search-panel [visible]="true" [width]="240" placeholder="ค้นหา..."></dxo-search-panel>
 
-  <div class="empty" *ngIf="!loading && leaves.length === 0">ไม่มีรายการ</div>
+    <dxi-column [width]="60" caption="#" alignment="center" cellTemplate="rowNumTemplate">
+      <div *dxTemplate="let cell of 'rowNumTemplate'">
+        {{ cell.component.pageIndex() * cell.component.pageSize() + cell.rowIndex + 1 }}
+      </div>
+    </dxi-column>
+
+    <dxi-column dataField="user_id" caption="ผู้ยื่น" [visible]="user?.role !== 'emp'" cellTemplate="userNameTemplate">
+      <div *dxTemplate="let data of 'userNameTemplate'">
+        {{ data.data.owner_name }}
+      </div>
+    </dxi-column>
+
+    <dxi-column dataField="leave_type" caption="ประเภท"></dxi-column>
+
+    <dxi-column caption="วันที่" cellTemplate="dateTemplate">
+      <div *dxTemplate="let data of 'dateTemplate'">
+        {{ data.data.start_date }} ~ {{ data.data.end_date }}
+      </div>
+    </dxi-column>
+
+    <dxi-column dataField="current_status" caption="สถานะ" cellTemplate="statusTemplate">
+      <div *dxTemplate="let data of 'statusTemplate'">
+        <app-status-badge [statusCode]="data.data.current_status"></app-status-badge>
+      </div>
+    </dxi-column>
+
+    <dxi-column caption="Actions" cellTemplate="actionsTemplate">
+      <div *dxTemplate="let data of 'actionsTemplate'">
+        <a class="btn-sm" [routerLink]="'/leave/' + data.data.id">ดูรายละเอียด</a>
+        <span class="tag" *ngIf="data.data.flag_send_back === 'Y'">🔄 ส่งกลับ</span>
+      </div>
+    </dxi-column>
+  </dx-data-grid>
 </div>

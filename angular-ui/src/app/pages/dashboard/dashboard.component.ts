@@ -39,10 +39,6 @@ export class DashboardComponent implements OnInit {
     return 'คำขอลาทั้งหมด';
   }
 
-  getUserName(userId: number): string {
-    return userId === 1 ? 'สมชาย' : userId === 2 ? 'สมหญิง' : `user#${userId}`;
-  }
-
   logout(): void {
     this.auth.logout();
     this.router.navigate(['/login']);

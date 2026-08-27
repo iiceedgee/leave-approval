@@ -4,20 +4,27 @@ const { v4: uuidv4 } = require('uuid');
 
 const UPLOAD_PATH = process.env.UPLOAD_PATH || 'uploads';
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id) || id < 1) return cb(new Error('Invalid leave ID'));
-    const dir = path.resolve(UPLOAD_PATH, String(id));
-    if (!dir.startsWith(path.resolve(UPLOAD_PATH))) return cb(new Error('Invalid path'));
-    require('fs').mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `${uuidv4()}${ext}`);
-  }
-});
+// Vercel filesystem is read-only (except /tmp) — ต้องใช้ memoryStorage บน Vercel
+// แล้วให้ FileService อัปโหลด buffer ต่อไปยัง Supabase Storage
+// Local (dev/test) ยังใช้ diskStorage เหมือนเดิมเพื่อให้ flow เดิมไม่เปลี่ยน
+const isVercel = !!process.env.VERCEL;
+
+const storage = isVercel
+  ? multer.memoryStorage()
+  : multer.diskStorage({
+      destination: (req, file, cb) => {
+        const id = req.params.id;
+        if (!id) return cb(new Error('Invalid leave ID'));
+        const dir = path.resolve(UPLOAD_PATH, String(id));
+        if (!dir.startsWith(path.resolve(UPLOAD_PATH))) return cb(new Error('Invalid path'));
+        require('fs').mkdirSync(dir, { recursive: true });
+        cb(null, dir);
+      },
+      filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname);
+        cb(null, `${uuidv4()}${ext}`);
+      },
+    });
 
 const fileFilter = (req, file, cb) => {
   const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
@@ -31,7 +38,7 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
   storage,
   fileFilter,
-  limits: { fileSize: 10 * 1024 * 1024, files: 5 }
+  limits: { fileSize: 10 * 1024 * 1024, files: 5 },
 });
 
 function handleMulterError(err, req, res, next) {
