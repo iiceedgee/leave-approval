@@ -91,12 +91,20 @@ app.get('/api/audit-logs', authMiddleware, roleMiddleware('hr'), (req, res) => {
 // Global error handler (must be last middleware)
 app.use(errorHandler);
 
-// Serve Angular SPA — ต้องอยู่ AFTER API routes เพื่อไม่ให้ดัก GET /api/*
-const angularDistPath = path.join(__dirname, '..', '..', 'angular-ui', 'dist');
-app.use(express.static(angularDistPath));
-app.get('*', (req, res) => {
-  res.sendFile(path.join(angularDistPath, 'index.html'));
-});
+// Serve Angular SPA — เฉพาะ local เท่านั้น
+// บน Vercel (process.env.VERCEL=1) ให้ API อย่างเดียว, SPA อยู่ project angular-ui แยก → กัน ENOENT /var/task/angular-ui/dist
+if (!process.env.VERCEL) {
+  const angularDistPath = path.join(__dirname, '..', '..', 'angular-ui', 'dist');
+  const fs = require('fs');
+  if (fs.existsSync(angularDistPath)) {
+    app.use(express.static(angularDistPath));
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(angularDistPath, 'index.html'));
+    });
+  }
+} else {
+  app.get('/', (req, res) => res.json({ status: 'ok', message: 'Leave API — use /api/health' }));
+}
 
 // Start — แยกสำหรับ local vs Vercel serverless
 // Vercel จะ import app ผ่าน api/index.js โดยไม่ต้อง listen, local ใช้ node src/app.js ถึงจะ listen
