@@ -26,33 +26,33 @@
     <dxo-sorting mode="single"></dxo-sorting>
     <dxo-search-panel [visible]="true" [width]="240" placeholder="ค้นหา..."></dxo-search-panel>
 
-    <dxi-column [width]="60" caption="#" alignment="center" cellTemplate="rowNumTemplate">
+    <dxi-column [width]="80" caption="ลำดับ" alignment="center" cellTemplate="rowNumTemplate">
       <div *dxTemplate="let cell of 'rowNumTemplate'">
         {{ cell.component.pageIndex() * cell.component.pageSize() + cell.rowIndex + 1 }}
       </div>
     </dxi-column>
 
-    <dxi-column dataField="user_id" caption="ผู้ยื่น" [visible]="user?.role !== 'emp'" cellTemplate="userNameTemplate">
+    <dxi-column dataField="user_id" caption="ผู้ยื่น" [visible]="user?.role !== 'emp'" cellTemplate="userNameTemplate" alignment="center">
       <div *dxTemplate="let data of 'userNameTemplate'">
         {{ data.data.owner_name }}
       </div>
     </dxi-column>
 
-    <dxi-column dataField="leave_type" caption="ประเภท"></dxi-column>
+    <dxi-column dataField="leave_type" caption="ประเภท" alignment="center"></dxi-column>
 
-    <dxi-column caption="วันที่" cellTemplate="dateTemplate">
+    <dxi-column caption="วันที่" cellTemplate="dateTemplate" alignment="center">
       <div *dxTemplate="let data of 'dateTemplate'">
         {{ data.data.start_date }} ~ {{ data.data.end_date }}
       </div>
     </dxi-column>
 
-    <dxi-column dataField="current_status" caption="สถานะ" cellTemplate="statusTemplate">
+    <dxi-column dataField="current_status" caption="สถานะ" cellTemplate="statusTemplate" alignment="center">
       <div *dxTemplate="let data of 'statusTemplate'">
         <app-status-badge [statusCode]="data.data.current_status"></app-status-badge>
       </div>
     </dxi-column>
 
-    <dxi-column caption="Actions" cellTemplate="actionsTemplate">
+    <dxi-column caption="Actions" cellTemplate="actionsTemplate" alignment="center">
       <div *dxTemplate="let data of 'actionsTemplate'">
         <a class="btn-sm" [routerLink]="'/leave/' + data.data.id">ดูรายละเอียด</a>
         <span class="tag" *ngIf="data.data.flag_send_back === 'Y'">🔄 ส่งกลับ</span>

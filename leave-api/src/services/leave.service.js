@@ -71,19 +71,21 @@ class LeaveService {
     return this.db.getLeaveById(id);
   }
 
-  // ★ อนุมัติ — ต้อง status MA (หลังตรวจเอกสารผ่าน) → set AP
+  // ★ อนุมัติ — ต้อง status MA และ role=mgr เท่านั้น (หัวหน้าคนเดียว)
   async approve(leaveId, userId, role, remark) {
+    if (role !== 'mgr') return { error: 'เฉพาะหัวหน้า (mgr) เท่านั้นที่อนุมัติได้' };
     const leave = await this.db.getLeaveById(leaveId);
     if (!leave) return { error: 'ไม่พบคำขอ' };
     if (leave.current_status !== STATUS.MA.code) return { error: 'ไม่สามารถอนุมัติได้ สถานะปัจจุบันไม่ใช่รอหัวหน้าตรวจสอบ (MA)' };
     return this.transition(leaveId, userId, role, STATUS.AP.code, remark);
   }
 
-  // ★ ส่งกลับแก้ไข — เฉพาะ status DC/VC/MA
+  // ★ ส่งกลับแก้ไข — DC/VC ให้ hr/mgr, MA ให้ mgr คนเดียว
   async sendBack(leaveId, userId, role, remark) {
     const leave = await this.db.getLeaveById(leaveId);
     if (!leave) return { error: 'ไม่พบคำขอ' };
     if (![STATUS.DC.code, STATUS.VC.code, STATUS.MA.code].includes(leave.current_status)) return { error: 'ไม่สามารถส่งกลับได้ สถานะปัจจุบันไม่รอการตรวจสอบ (DC/VC/MA)' };
+    if (leave.current_status === STATUS.MA.code && role !== 'mgr') return { error: 'เฉพาะหัวหน้าเท่านั้นที่ส่งกลับที่ MA ได้' };
 
     const updated = await this.db.updateLeave(leaveId, {
       current_status: STATUS.SU.code,
@@ -102,11 +104,12 @@ class LeaveService {
     return updated;
   }
 
-  // ★ ไม่อนุมัติ — เฉพาะ status VC/MA
+  // ★ ไม่อนุมัติ — VC ให้ hr/mgr, MA ให้ mgr คนเดียว
   async reject(leaveId, userId, role, remark) {
     const leave = await this.db.getLeaveById(leaveId);
     if (!leave) return { error: 'ไม่พบคำขอ' };
     if (![STATUS.VC.code, STATUS.MA.code].includes(leave.current_status)) return { error: 'ไม่สามารถไม่อนุมัติได้ สถานะปัจจุบันไม่ใช่รอตรวจสอบหรือรอหัวหน้าตรวจสอบ (VC/MA)' };
+    if (leave.current_status === STATUS.MA.code && role !== 'mgr') return { error: 'เฉพาะหัวหน้าเท่านั้นที่ไม่อนุมัติที่ MA ได้' };
     return this.transition(leaveId, userId, role, STATUS.RJ.code, remark);
   }
 

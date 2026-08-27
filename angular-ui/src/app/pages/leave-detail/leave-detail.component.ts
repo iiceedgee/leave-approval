@@ -84,33 +84,33 @@ export class LeaveDetailComponent implements OnInit, OnDestroy {
     return this.user?.role === 'mgr' && this.leave?.current_status === STATUS.MA.code;
   }
 
-  // Flow A: HR ตรวจเอกสาร 2 ด่าน (DC/VC), MGR อนุมัติอย่างเดียว (MA)
+  // ตรวจเอกสารได้ทั้ง HR/MGR, แต่อนุมัติได้แค่ MGR (ตามสั่งล่าสุด)
   get canDoPretemp(): boolean {
-    return this.user?.role === 'hr' && this.leave?.current_status === STATUS.DC.code;
+    return (this.user?.role === 'hr' || this.user?.role === 'mgr') && this.leave?.current_status === STATUS.DC.code;
   }
 
   get canDoTemp(): boolean {
-    return this.user?.role === 'hr' && this.leave?.current_status === STATUS.VC.code;
+    return (this.user?.role === 'hr' || this.user?.role === 'mgr') && this.leave?.current_status === STATUS.VC.code;
   }
 
   get canSendBack(): boolean {
-    // HR ส่งกลับได้ที่ DC/VC, MGR ส่งกลับได้ที่ MA เท่านั้น
-    if (this.user?.role === 'hr') {
-      return this.leave?.current_status === STATUS.DC.code || this.leave?.current_status === STATUS.VC.code;
+    // HR/MGR ส่งกลับได้ที่ DC/VC, ส่วน MA ให้ MGR เท่านั้น
+    if (this.leave?.current_status === STATUS.DC.code || this.leave?.current_status === STATUS.VC.code) {
+      return this.user?.role === 'hr' || this.user?.role === 'mgr';
     }
-    if (this.user?.role === 'mgr') {
-      return this.leave?.current_status === STATUS.MA.code;
+    if (this.leave?.current_status === STATUS.MA.code) {
+      return this.user?.role === 'mgr';
     }
     return false;
   }
 
   get canReject(): boolean {
-    // HR ไม่อนุมัติได้ที่ VC, MGR ไม่อนุมัติได้ที่ MA
-    if (this.user?.role === 'hr') {
-      return this.leave?.current_status === STATUS.VC.code;
+    // VC ให้ HR/MGR ไม่อนุมัติได้, MA ให้ MGR เท่านั้น
+    if (this.leave?.current_status === STATUS.VC.code) {
+      return this.user?.role === 'hr' || this.user?.role === 'mgr';
     }
-    if (this.user?.role === 'mgr') {
-      return this.leave?.current_status === STATUS.MA.code;
+    if (this.leave?.current_status === STATUS.MA.code) {
+      return this.user?.role === 'mgr';
     }
     return false;
   }

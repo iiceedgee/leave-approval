@@ -70,3 +70,19 @@ a { text-decoration: none; color: $primary; }
 
 .dx-widget, .dx-theme-generic-typography, .dx-datagrid, .dx-datagrid * { font-family: 'Sarabun','Noto Sans Thai',system-ui,-apple-system,'Segoe UI',sans-serif !important; }
 body, .dx-widget { line-height: 1.6; letter-spacing: 0; }
+
+// Fix DevExtreme search icon showing as square □ — override to use Font Awesome magnifying glass
+.dx-datagrid-search-panel .dx-icon-search::before {
+  content: "\f002" !important;
+  font-family: "Font Awesome 6 Free" !important;
+  font-weight: 900 !important;
+}
+
+// Center all DataGrid headers (user request: กลางหมด)
+.dx-datagrid-headers .dx-header-row > td {
+  text-align: center !important;
+}
+.dx-datagrid-headers .dx-datagrid-text-content {
+  text-align: center !important;
+  width: 100%;
+}

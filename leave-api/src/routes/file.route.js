@@ -42,6 +42,11 @@ module.exports = function (fileService) {
           }
         }
 
+        // หลัง AP/RJ/CX (เสร็จสิ้น) ไม่ให้แนบไฟล์แล้ว — ตาม flow ไม่จำเป็น
+        if ([STATUS.AP.code, STATUS.RJ.code, STATUS.CX.code].includes(leave.current_status)) {
+          return res.status(400).json({ message: 'คำขอเสร็จสิ้นแล้วไม่สามารถแนบไฟล์ได้' });
+        }
+
         if (!req.files || req.files.length === 0) {
           return res.status(400).json({ message: 'กรุณาเลือกไฟล์อย่างน้อย 1 ไฟล์' });
         }

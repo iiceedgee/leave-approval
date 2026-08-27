@@ -15,10 +15,8 @@ module.exports = function (leaveService) {
     res.json(leave);
   }
 
-  // POST /api/approval/:id/approve — อนุมัติ (stamp S)
-  router.post('/:id/approve', async (req, res) => {
-    // ⚠️ เดิม: const id = parseInt(req.params.id) — id ตัวเลข
-    // พอเป็น Supabase → id เป็น UUID string ใช้ req.params.id ตรงๆ
+  // POST /api/approval/:id/approve — อนุมัติ (หัวหน้าคนเดียว)
+  router.post('/:id/approve', roleMiddleware('mgr'), async (req, res) => {
     const id = req.params.id;
     const leave = await leaveService.approve(id, req.user.id, req.user.role, req.body.remark);
     handleResult(leave, res);

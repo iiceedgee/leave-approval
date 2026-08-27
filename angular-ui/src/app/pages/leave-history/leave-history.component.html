@@ -68,19 +68,19 @@
     <dxo-search-panel [visible]="true" [width]="240" placeholder="ค้นหา..."></dxo-search-panel>
     <dxo-filter-row [visible]="true"></dxo-filter-row>
 
-    <dxi-column [width]="60" caption="#" alignment="center" cellTemplate="rowNumTemplate">
+    <dxi-column [width]="80" caption="ลำดับ" alignment="center" cellTemplate="rowNumTemplate">
       <div *dxTemplate="let cell of 'rowNumTemplate'">
         {{ cell.component.pageIndex() * cell.component.pageSize() + cell.rowIndex + 1 }}
       </div>
     </dxi-column>
 
-    <dxi-column dataField="leave_type" caption="ประเภท" cellTemplate="typeTemplate">
+    <dxi-column dataField="leave_type" caption="ประเภท" cellTemplate="typeTemplate" alignment="center">
       <div *dxTemplate="let data of 'typeTemplate'">
         <span class="leave-type-tag">{{ data.data.leave_type }}</span>
       </div>
     </dxi-column>
 
-    <dxi-column caption="วันที่" cellTemplate="dateTemplate">
+    <dxi-column caption="วันที่" cellTemplate="dateTemplate" alignment="center">
       <div *dxTemplate="let data of 'dateTemplate'">
         {{ formatThaiDateRange(data.data.start_date, data.data.end_date) }}
       </div>
@@ -88,7 +88,7 @@
 
     <dxi-column dataField="used_days" caption="จำนวนวัน" alignment="center" dataType="number"></dxi-column>
 
-    <dxi-column dataField="current_status" caption="สถานะ" cellTemplate="statusTemplate">
+    <dxi-column dataField="current_status" caption="สถานะ" cellTemplate="statusTemplate" alignment="center">
       <div *dxTemplate="let data of 'statusTemplate'">
         <span class="status-tag" [ngClass]="getStatusClass(data.data.current_status)">
           {{ getStatusLabel(data.data.current_status) }}
