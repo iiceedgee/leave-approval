@@ -41,8 +41,12 @@ class SupabaseStore {
   }
 
   async getCounts() {
-    const { count: users } = await this.supabase.from('users').select('*', { count: 'exact', head: true });
-    const { count: leaves } = await this.supabase.from('leave_requests').select('*', { count: 'exact', head: true });
+    const { count: users, error: uErr } = await this.supabase.from('users').select('*', { count: 'exact', head: true });
+    const { count: leaves, error: lErr } = await this.supabase.from('leave_requests').select('*', { count: 'exact', head: true });
+    if (uErr) console.error('[DB] getCounts users', uErr);
+    if (lErr) console.error('[DB] getCounts leaves', lErr);
+    if (uErr) throw uErr;
+    if (lErr) throw lErr;
     return { users, leaves };
   }
 
@@ -51,12 +55,14 @@ class SupabaseStore {
   // แต่ query ไปที่ตาราง users ใน Supabase จริง
   // maybeSingle = ขอแค่ 1 แถว (ถ้าไม่เจอได้ null)
   async findUserByUsername(username) {
-    const { data } = await this.supabase.from('users').select('*').eq('username', username).maybeSingle();
+    const { data, error } = await this.supabase.from('users').select('*').eq('username', username).maybeSingle();
+    if (error) { console.error('[DB] findUserByUsername', error); throw error; }
     return data || null;
   }
 
   async findUserById(id) {
-    const { data } = await this.supabase.from('users').select('*').eq('id', id).maybeSingle();
+    const { data, error } = await this.supabase.from('users').select('*').eq('id', id).maybeSingle();
+    if (error) { console.error('[DB] findUserById', error); throw error; }
     return data || null;
   }
 
@@ -89,7 +95,8 @@ class SupabaseStore {
   }
 
   async getLeaveById(id) {
-    const { data } = await this.supabase.from('leave_requests').select('*').eq('id', id).maybeSingle();
+    const { data, error } = await this.supabase.from('leave_requests').select('*').eq('id', id).maybeSingle();
+    if (error) { console.error('[DB] getLeaveById', error); throw error; }
     return data || null;
   }
 

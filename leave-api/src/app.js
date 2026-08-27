@@ -49,6 +49,7 @@ app.use(express.json());
 // ★ เลือก data layer: มี Supabase จริง → ใช้ SupabaseStore, ไม่งั้นใช้ InMemory
 // เดิมบรรทัดนี้มีแค่: const db = new InMemoryStore();
 const db = supabaseClient ? new SupabaseStore(supabaseClient) : new InMemoryStore();
+app.set('db', db);
 
 app.use(auditLogMiddleware(db));
 
@@ -73,8 +74,13 @@ app.use('/api/approval', verificationFileRoute(fileService));
 
 // Health check
 app.get('/api/health', async (req, res) => {
-  const counts = await db.getCounts();
-  res.json({ status: 'ok', users: counts.users, leaves: counts.leaves });
+  try {
+    const counts = await db.getCounts();
+    res.json({ status: 'ok', users: counts.users, leaves: counts.leaves });
+  } catch (e) {
+    console.error('[health]', e);
+    res.status(500).json({ status: 'error', message: e.message });
+  }
 });
 
 // Audit logs (HR only)

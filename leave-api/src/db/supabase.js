@@ -29,7 +29,7 @@
 const { createClient } = require('@supabase/supabase-js');
 
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_ANON_KEY;
+const supabaseKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY;
 
 let supabase = null;
 
@@ -40,8 +40,9 @@ const isSupabaseConfigured =
   !supabaseUrl.includes('YOUR_SUPABASE_URL');
 
 if (isSupabaseConfigured) {
+  if (supabaseKey.length < 100) console.warn(`[DB] ⚠️ key length ${supabaseKey.length} — อาจตัดสั้น!`);
   supabase = createClient(supabaseUrl, supabaseKey);
-  console.log('[DB] ✅ Connected to Supabase (Postgres)');
+  console.log(`[DB] ✅ Connected via ${supabaseKey.startsWith('sb_secret')?'secret/service_role':'anon'} (${supabaseKey.length} chars)`);
 } else {
   console.log('[DB] ❌ Supabase not configured — using in-memory fallback');
 }
