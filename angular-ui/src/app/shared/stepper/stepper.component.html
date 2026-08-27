@@ -6,14 +6,8 @@
     [class.cancelled]="step.state === 'cancelled'"
     [class.rejected]="step.state === 'rejected'">
     <div class="step-box">
-      <div class="step-back">
-        <i [class]="step.icon"></i>
-        <span class="back-status">{{ stateLabel(step) }}</span>
-      </div>
-      <div class="step-front">
-        <div class="icon-container"><i [class]="step.icon"></i></div>
-        <div class="label">{{ step.name }}</div>
-      </div>
+      <div class="icon-container"><i [class]="step.icon"></i></div>
+      <div class="label">{{ step.name }}</div>
     </div>
     <div class="step-line"></div>
   </div>

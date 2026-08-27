@@ -7,60 +7,32 @@
   flex: 1; position: relative; text-align: start;
 }
 
-@keyframes pop-in {
-  0%   { transform: scale(0); }
-  60%  { transform: scale(1.15); }
-  100% { transform: scale(1); }
+.step-box {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 4px; padding: 8px; border-radius: 8px; background: white;
 }
-
-@keyframes pulse-ring {
-  0%   { box-shadow: 0 0 0 0 rgba(14, 51, 98, 0.35); }
-  70%  { box-shadow: 0 0 0 8px rgba(14, 51, 98, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(14, 51, 98, 0); }
-}
-
-@keyframes fill-line {
-  from { background-color: #C4C4C4; }
-  to   { background-color: currentColor; }
-}
-
-.step-box { position: relative; overflow: hidden; border-radius: 8px; padding: 8px; }
-.step-back {
-  position: absolute; inset: 0; z-index: 0;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 4px; color: white; background: #0E3362;
-  .back-status { font-size: 12px; opacity: 0.9; }
-}
-.step-front {
-  position: relative; z-index: 1;
-  display: flex; flex-direction: column; align-items: start;
-  background: white;
-  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
-}
-.step-box:hover .step-front { transform: translateY(-100%); }
 
 .icon-container { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; color: #C4C4C4; }
 .icon-container i { font-size: 24px; }
 .step-line { width: 100%; height: 4px; margin: 8px 0; background-color: #C4C4C4; }
-.label { font-size: 13px; color: #666; max-width: 100px; line-height: 1.3; }
+.label { font-size: 13px; color: #666; max-width: 100px; line-height: 1.3; text-align: center; }
 
-.step.active { color: #002f66; }
-.step.done { color: #2e7d32; }
-
-.step.active:not(.done) .icon-container { border-radius: 50%; color: #002f66; animation: pulse-ring 1.8s ease-out infinite; }
-.step.active:not(.done) .step-line { background-color: #002f66; animation: fill-line 0.8s ease-out 1; }
-.step.active .label { color: #002f66; font-weight: 500; }
-.step.done .step-front { animation: pop-in 0.4s ease-out 1; }
+// ปกติ: ถึงไหนเขียวถึงนั่น (active + done = เขียว)
+.step.active .icon-container,
 .step.done .icon-container { color: #2e7d32; }
-.step.done .step-line { background-color: #2e7d32; animation: fill-line 0.8s ease-out 1; }
-.step.done .label { color: #2e7d32; }
-.step.cancelled .icon-container { color: #c62828; }
-.step.cancelled .step-line { background-color: #c62828; }
-.step.cancelled .label { color: #c62828; }
-.step.rejected .icon-container { color: #c62828; }
-.step.rejected .step-line { background-color: #c62828; }
-.step.rejected .label { color: #c62828; }
 
-@media (prefers-reduced-motion: reduce) {
-  .step * { animation: none !important; transition: none !important; }
-}
+.step.active .label,
+.step.done .label { color: #2e7d32; font-weight: 500; }
+
+.step.active .step-line,
+.step.done .step-line { background-color: #2e7d32; }
+
+// ยกเลิก/ไม่อนุมัติ = แดง
+.step.cancelled .icon-container,
+.step.rejected .icon-container { color: #c62828; }
+
+.step.cancelled .step-line,
+.step.rejected .step-line { background-color: #c62828; }
+
+.step.cancelled .label,
+.step.rejected .label { color: #c62828; }
