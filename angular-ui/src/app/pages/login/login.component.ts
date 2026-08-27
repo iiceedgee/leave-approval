@@ -23,7 +23,13 @@ export class LoginComponent {
     this.error = '';
     this.auth.login(this.username, this.password).subscribe({
       next: (res) => {
-        this.router.navigate([res.user.role === 'emp' ? '/leave/new' : '/dashboard']);
+        const target = res.user.role === 'emp' ? '/leave/new' : '/dashboard';
+        this.router.navigate([target]).then(ok => {
+          if (!ok) {
+            console.warn('[login] navigate blocked', target, 'isLoggedIn', this.auth.isLoggedIn());
+            this.error = 'เข้าสู่ระบบสำเร็จแต่ไม่สามารถเปลี่ยนหน้าได้ กรุณารีเฟรช';
+          }
+        });
       },
       error: (err) => { this.error = err.error?.message || 'เข้าสู่ระบบไม่สำเร็จ'; }
     });

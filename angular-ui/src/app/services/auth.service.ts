@@ -43,8 +43,17 @@ export class AuthService {
     const token = this.getToken();
     if (!token) return false;
     try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      return payload.exp * 1000 > Date.now();
+      const base64Url = token.split('.')[1];
+      if (!base64Url) return false;
+      let base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      base64 += '='.repeat((4 - (base64.length % 4)) % 4);
+      const binary = atob(base64);
+      // atob returns latin1 binary — decode UTF-8 safely (รองรับ fullName ภาษาไทย)
+      const json = decodeURIComponent(
+        Array.prototype.map.call(binary, (c: string) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')
+      );
+      const payload = JSON.parse(json);
+      return typeof payload.exp === 'number' && payload.exp * 1000 > Date.now();
     } catch { return false; }
   }
 }
