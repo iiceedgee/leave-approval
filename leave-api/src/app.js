@@ -1,6 +1,7 @@
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
 const express = require('express');
+require('express-async-errors');
 const cors = require('cors');
 
 const { InMemoryStore } = require('./store');

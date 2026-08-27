@@ -43,10 +43,8 @@ class SupabaseStore {
   async getCounts() {
     const { count: users, error: uErr } = await this.supabase.from('users').select('*', { count: 'exact', head: true });
     const { count: leaves, error: lErr } = await this.supabase.from('leave_requests').select('*', { count: 'exact', head: true });
-    if (uErr) console.error('[DB] getCounts users', uErr);
-    if (lErr) console.error('[DB] getCounts leaves', lErr);
-    if (uErr) throw uErr;
-    if (lErr) throw lErr;
+    if (uErr) { console.error('[DB] getCounts error:', JSON.stringify(uErr, null, 2)); const e=new Error(uErr.message); e.code=uErr.code; e.details=uErr.details; e.hint=uErr.hint; throw e; }
+    if (lErr) { console.error('[DB] getCounts error:', JSON.stringify(lErr, null, 2)); const e=new Error(lErr.message); e.code=lErr.code; e.details=lErr.details; e.hint=lErr.hint; throw e; }
     return { users, leaves };
   }
 
@@ -56,7 +54,7 @@ class SupabaseStore {
   // maybeSingle = ขอแค่ 1 แถว (ถ้าไม่เจอได้ null)
   async findUserByUsername(username) {
     const { data, error } = await this.supabase.from('users').select('*').eq('username', username).maybeSingle();
-    if (error) { console.error('[DB] findUserByUsername', error); throw error; }
+    if (error) { console.error('[DB] findUserByUsername error:', JSON.stringify(error, null, 2)); const e=new Error(error.message); e.code=error.code; e.details=error.details; e.hint=error.hint; throw e; }
     return data || null;
   }
 
@@ -90,7 +88,7 @@ class SupabaseStore {
       .insert(data)
       .select()
       .single();
-    if (error) throw error;
+    if (error) { console.error('[DB] createLeave error:', JSON.stringify(error, null, 2)); const e=new Error(error.message); e.code=error.code; e.details=error.details; e.hint=error.hint; throw e; }
     return leave;
   }
 

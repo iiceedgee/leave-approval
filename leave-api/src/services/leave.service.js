@@ -14,6 +14,11 @@ class LeaveService {
 
   // พนักงานยื่นคำขอลา → status = SU
   async create(userId, data) {
+    const allowed = Object.keys(require('../config/leave-quota'));
+    if (!data.leave_type || !allowed.includes(data.leave_type.trim())) throw Object.assign(new Error(`leave_type ต้องเป็น ${allowed.join(', ')}`), {statusCode:400});
+    if (!data.start_date || !data.end_date || isNaN(Date.parse(data.start_date)) || isNaN(Date.parse(data.end_date))) throw Object.assign(new Error('รูปแบบวันที่ไม่ถูกต้อง (YYYY-MM-DD)'), {statusCode:400});
+    if (new Date(data.end_date) < new Date(data.start_date)) throw Object.assign(new Error('วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่ม'), {statusCode:400});
+    if (!data.reason || data.reason.trim().length < 5) throw Object.assign(new Error('เหตุผลต้องมีอย่างน้อย 5 ตัวอักษร'), {statusCode:400});
     const leave = await this.db.createLeave({
       user_id: userId,
       leave_type: data.leave_type,
