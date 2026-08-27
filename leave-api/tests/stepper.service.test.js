@@ -1,11 +1,11 @@
 // =====================================================
 //  Unit Test สำหรับ Stepper Service
 //
-//  Stepper มี 5 ขั้น:
+//  Stepper มี 5 ขั้น (Flow A: HR ตรวจ 2 ด่าน):
 //  1. ยื่นคำขอ (SU)
-//  2. ตรวจสอบเอกสาร (DC)
-//  3. หัวหน้าตรวจสอบ (MA)
-//  4. HR อนุมัติ (AP)
+//  2. ตรวจสอบครบถ้วน (DC) — HR
+//  3. ตรวจสอบถูกต้อง (VC) — HR
+//  4. หัวหน้าอนุมัติ (MA) — MGR
 //  5. เสร็จสิ้น (AP)
 //
 //  แต่ละขั้นมี state: current | done | pending | cancelled | rejected
@@ -47,22 +47,24 @@ describe('getStepperSteps — สถานะ DC (รอตรวจสอบเ
 });
 
 describe('getStepperSteps — สถานะ VC (ตรวจสอบความถูกต้อง)', () => {
-  it('VC → step 1 = done, step 2 = current', () => {
+  it('VC → step 1-2 = done, step 3 = current', () => {
     const steps = getStepperSteps('VC', 'N', []);
 
-    expect(steps[0].state).toBe('done');
-    expect(steps[1].state).toBe('current');
+    expect(steps[0].state).toBe('done');    // ยื่นคำขอ
+    expect(steps[1].state).toBe('done');    // ตรวจสอบครบถ้วน
+    expect(steps[2].state).toBe('current'); // ตรวจสอบถูกต้อง
+    expect(steps[3].state).toBe('pending');
   });
 });
 
 describe('getStepperSteps — สถานะ MA (รอหัวหน้าอนุมัติ)', () => {
-  it('MA → step 1-2 = done, step 3 = current', () => {
+  it('MA → step 1-3 = done, step 4 = current', () => {
     const steps = getStepperSteps('MA', 'N', []);
 
-    expect(steps[0].state).toBe('done');
-    expect(steps[1].state).toBe('done');
-    expect(steps[2].state).toBe('current'); // หัวหน้าตรวจสอบ
-    expect(steps[3].state).toBe('pending');
+    expect(steps[0].state).toBe('done');    // ยื่นคำขอ
+    expect(steps[1].state).toBe('done');    // ตรวจสอบครบถ้วน
+    expect(steps[2].state).toBe('done');    // ตรวจสอบถูกต้อง
+    expect(steps[3].state).toBe('current'); // หัวหน้าอนุมัติ
     expect(steps[4].state).toBe('pending');
   });
 });

@@ -69,25 +69,32 @@ class InMemoryStore {
 
   // ---- leaves ----
   async createLeave(data) {
+    // Whitelist — กัน client ส่ง current_status=F มาทับ SU
+    const { current_status, flag_send_back, send_back_count, ...safe } = data;
+    const allowed = ['SU','DC','VC','MA','AP','SB','CX','RJ'];
+    const finalStatus = allowed.includes(current_status) ? current_status : 'SU';
     const leave = {
       id: this._uuid(),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-      current_status: 'SU',
-      flag_send_back: 'N',
-      send_back_count: 0,
-      ...data,
+      current_status: finalStatus === 'F' ? 'SU' : finalStatus,
+      flag_send_back: flag_send_back === 'Y' ? 'Y' : 'N',
+      send_back_count: Number.isInteger(send_back_count) ? send_back_count : 0,
+      ...safe,
     };
     this.leaves.push(leave);
     return leave;
   }
 
+  _norm(l) { return l && l.current_status === 'F' ? { ...l, current_status: 'SU' } : l; }
+
   async getLeaveById(id) {
-    return this.leaves.find(l => l.id === id) || null;
+    const l = this.leaves.find(le => le.id === id) || null;
+    return this._norm(l);
   }
 
   async listLeaves() {
-    return this.leaves;
+    return this.leaves.map(l => this._norm(l));
   }
 
   async updateLeave(id, fields) {

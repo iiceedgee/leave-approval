@@ -84,22 +84,35 @@ export class LeaveDetailComponent implements OnInit, OnDestroy {
     return this.user?.role === 'mgr' && this.leave?.current_status === STATUS.MA.code;
   }
 
+  // Flow A: HR ตรวจเอกสาร 2 ด่าน (DC/VC), MGR อนุมัติอย่างเดียว (MA)
   get canDoPretemp(): boolean {
-    return (this.user?.role === 'mgr' || this.user?.role === 'hr') && this.leave?.current_status === STATUS.DC.code;
+    return this.user?.role === 'hr' && this.leave?.current_status === STATUS.DC.code;
   }
 
   get canDoTemp(): boolean {
-    return (this.user?.role === 'mgr' || this.user?.role === 'hr') && this.leave?.current_status === STATUS.VC.code;
+    return this.user?.role === 'hr' && this.leave?.current_status === STATUS.VC.code;
   }
 
   get canSendBack(): boolean {
-    return (this.user?.role === 'mgr' || this.user?.role === 'hr') &&
-      (this.leave?.current_status === STATUS.DC.code || this.leave?.current_status === STATUS.VC.code || this.leave?.current_status === STATUS.MA.code);
+    // HR ส่งกลับได้ที่ DC/VC, MGR ส่งกลับได้ที่ MA เท่านั้น
+    if (this.user?.role === 'hr') {
+      return this.leave?.current_status === STATUS.DC.code || this.leave?.current_status === STATUS.VC.code;
+    }
+    if (this.user?.role === 'mgr') {
+      return this.leave?.current_status === STATUS.MA.code;
+    }
+    return false;
   }
 
   get canReject(): boolean {
-    return (this.user?.role === 'mgr' || this.user?.role === 'hr') &&
-      (this.leave?.current_status === STATUS.VC.code || this.leave?.current_status === STATUS.MA.code);
+    // HR ไม่อนุมัติได้ที่ VC, MGR ไม่อนุมัติได้ที่ MA
+    if (this.user?.role === 'hr') {
+      return this.leave?.current_status === STATUS.VC.code;
+    }
+    if (this.user?.role === 'mgr') {
+      return this.leave?.current_status === STATUS.MA.code;
+    }
+    return false;
   }
 
   get canCancel(): boolean {

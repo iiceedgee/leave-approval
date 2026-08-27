@@ -64,7 +64,8 @@ export class LeaveHistoryComponent implements OnInit {
   getStatusClass(code: string): string {
     const map: Record<string, string> = {
       AP: 'status-approved', CX: 'status-cancelled', RJ: 'status-rejected',
-      SB: 'status-sendback', SU: 'status-pending',
+      SB: 'status-sendback', SU: 'status-pending', F: 'status-pending',
+      DC: 'status-sendback', VC: 'status-pending', MA: 'status-approved',
     };
     return map[code] || 'status-other';
   }

@@ -21,10 +21,13 @@ class LeaveService {
     if (!data.reason || data.reason.trim().length < 5) throw Object.assign(new Error('เหตุผลต้องมีอย่างน้อย 5 ตัวอักษร'), {statusCode:400});
     const leave = await this.db.createLeave({
       user_id: userId,
-      leave_type: data.leave_type,
+      leave_type: data.leave_type.trim(),
       start_date: data.start_date,
       end_date: data.end_date,
-      reason: data.reason,
+      reason: data.reason.trim(),
+      current_status: STATUS.SU.code,
+      flag_send_back: 'N',
+      send_back_count: 0,
     });
 
     // บันทึก history

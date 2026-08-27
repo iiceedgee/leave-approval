@@ -43,9 +43,12 @@ a { text-decoration: none; color: $primary; }
 // Badge
 .badge { background: #e8eaf6; padding: 6px 12px; border-radius: 4px; font-size: 13px; color: $primary; }
 
-// Status badges
+// Status badges — ครบ flow SU/DC/VC/MA/AP/SB/CX/RJ + รองรับ F เก่า
 .status-badge { padding: 4px 10px; border-radius: 12px; font-size: 12px; }
-.status-SU { background: #fff3e0; color: $warning; }
+.status-SU, .status-F { background: #fff3e0; color: $warning; }
+.status-DC { background: #e3f2fd; color: $sendback; }
+.status-VC { background: #e8eaf6; color: $primary; }
+.status-MA { background: #fff8e1; color: #f57f17; }
 .status-AP { background: #e8f5e9; color: $success; }
 .status-SB { background: #e3f2fd; color: $sendback; }
 .status-CX, .status-RJ { background: #fce4ec; color: $danger; }

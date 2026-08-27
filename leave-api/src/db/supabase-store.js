@@ -83,24 +83,48 @@ class SupabaseStore {
   // insert + .select().single() = ส่งเข้าแล้วขอข้อมูลที่ insert กลับมา
   // (id, created_at ฯลฯ ที่ database สร้างให้)
   async createLeave(data) {
+    // Enforce defaults + whitelist — กัน client ส่ง current_status ผิดๆ มาทับ และกัน DB default ผิด (F) ของ prod เก่า
+    const payload = {
+      current_status: 'SU',
+      flag_send_back: 'N',
+      send_back_count: 0,
+      ...data,
+    };
+    // ถ้า client ส่ง SU/DC ฯลฯ มาให้ใช้ตามนั้น แต่ถ้าส่ง F หรือค่าผิดให้ fallback SU
+    const allowed = ['SU','DC','VC','MA','AP','SB','CX','RJ'];
+    if (!allowed.includes(payload.current_status)) payload.current_status = 'SU';
+    // รองรับ prod เก่าที่ default เป็น F — ถ้า payload มี F ให้แก้เป็น SU ก่อน insert
+    if (payload.current_status === 'F') payload.current_status = 'SU';
     const { data: leave, error } = await this.supabase
       .from('leave_requests')
-      .insert(data)
+      .insert(payload)
       .select()
       .single();
     if (error) { console.error('[DB] createLeave error:', JSON.stringify(error, null, 2)); const e=new Error(error.message); e.code=error.code; e.details=error.details; e.hint=error.hint; throw e; }
+    // Defensive: ถ้า DB ยังคืน F (trigger/default ผิด) ให้แก้ใน code
+    if (leave && leave.current_status === 'F') {
+      console.warn('[DB] createLeave returned F — auto patch to SU', leave.id);
+      const patched = await this.updateLeave(leave.id, { current_status: 'SU' });
+      return patched || { ...leave, current_status: 'SU' };
+    }
+    return leave;
+  }
+
+  _normalizeLeave(leave) {
+    if (!leave) return leave;
+    if (leave.current_status === 'F') return { ...leave, current_status: 'SU' };
     return leave;
   }
 
   async getLeaveById(id) {
     const { data, error } = await this.supabase.from('leave_requests').select('*').eq('id', id).maybeSingle();
     if (error) { console.error('[DB] getLeaveById', error); throw error; }
-    return data || null;
+    return this._normalizeLeave(data) || null;
   }
 
   async listLeaves() {
     const { data } = await this.supabase.from('leave_requests').select('*');
-    return data || [];
+    return (data || []).map(l => this._normalizeLeave(l));
   }
 
   async updateLeave(id, fields) {
