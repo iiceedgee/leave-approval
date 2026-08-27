@@ -11,13 +11,30 @@ class FileService {
     this.db = db;
   }
 
+  /**
+   * saveFile — บันทึกไฟล์ลง storage (Supabase หรือ disk) แล้วสร้าง document record
+   * @param {string} leaveId 
+   * @param {string} userId 
+   * @param {object} file — multer file (diskStorage: {filename,path} หรือ memoryStorage: {buffer})
+   * @param {string} uploadStage — 'emp' | 'pretemp' | 'temp' (temp deprecated, legacy VC)
+   */
   async saveFile(leaveId, userId, file, uploadStage = 'emp') {
+    if (!leaveId || !userId || !file) throw new Error('พารามิเตอร์ไม่ครบสำหรับ saveFile');
+    // Normalize deprecated stage: temp (VC) -> pretemp for logging, but keep original for audit
+    const normalizedStage = uploadStage === 'temp' ? 'pretemp' : uploadStage;
+    if (uploadStage === 'temp') {
+      console.warn('[FileService] deprecated stage temp (VC) — mapping to pretemp for storage');
+    }
+    // Validate stage
+    const allowedStages = ['emp', 'pretemp', 'temp'];
+    const stageToStore = allowedStages.includes(uploadStage) ? uploadStage : 'emp';
+
     const isVercel = !!process.env.VERCEL;
 
     // ถ้าเป็น Vercel + มี buffer (memoryStorage) ให้อัปโหลดเข้า Supabase Storage
     // defensive: ถ้า supabase client เป็น null (local in-memory fallback) ให้ fallback ไป disk logic
     if (isVercel && file.buffer && supabase) {
-      const ext = path.extname(file.originalname);
+      const ext = path.extname(file.originalname || '');
       // multer.memoryStorage ไม่มี filename — ต้อง gen เอง
       const filename = file.filename || `${uuidv4()}${ext}`;
       const supabasePath = path.posix.join(String(leaveId), filename);
@@ -30,6 +47,7 @@ class FileService {
         });
 
       if (error) {
+        // Handle storage errors with clear message for route layer
         throw new Error(`Upload failed: ${error.message}`);
       }
 
@@ -41,14 +59,14 @@ class FileService {
         file_size: file.size || file.buffer.length,
         file_path: supabasePath, // เก็บเป็น supabase storage path (ไม่ใช่ local path)
         uploaded_by: userId,
-        upload_stage: uploadStage,
+        upload_stage: stageToStore,
       });
     }
 
     // Fallback / Local: ใช้ logic เดิม (diskStorage มี filename และ path บน disk)
     // กรณี Vercel แต่ไม่มี supabase หรือไม่มี buffer ก็ fallback มาด้านนี้เพื่อไม่ให้ flow พัง
     if (isVercel && file.buffer && !supabase) {
-      const ext = path.extname(file.originalname);
+      const ext = path.extname(file.originalname || '');
       const filename = file.filename || `${uuidv4()}${ext}`;
       return this.db.createDocument({
         leave_request_id: leaveId,
@@ -58,11 +76,26 @@ class FileService {
         file_size: file.size || file.buffer.length,
         file_path: path.join(String(leaveId), filename),
         uploaded_by: userId,
-        upload_stage: uploadStage,
+        upload_stage: stageToStore,
       });
     }
 
     // Non-Vercel (local) — file มาจาก diskStorage มี file.filename แน่นอน
+    if (!file.filename) {
+      // Defensive: if somehow we got buffer without supabase on local, generate filename
+      const ext = path.extname(file.originalname || '');
+      const filename = `${uuidv4()}${ext}`;
+      return this.db.createDocument({
+        leave_request_id: leaveId,
+        file_name: filename,
+        original_name: file.originalname,
+        mime_type: file.mimetype,
+        file_size: file.size || file.buffer?.length || 0,
+        file_path: path.join(String(leaveId), filename),
+        uploaded_by: userId,
+        upload_stage: stageToStore,
+      });
+    }
     return this.db.createDocument({
       leave_request_id: leaveId,
       file_name: file.filename,
@@ -71,19 +104,32 @@ class FileService {
       file_size: file.size,
       file_path: path.join(String(leaveId), file.filename),
       uploaded_by: userId,
-      upload_stage: uploadStage,
+      upload_stage: stageToStore,
     });
   }
 
   async getFiles(leaveId) {
-    return this.db.listDocumentsByLeave(leaveId);
+    if (!leaveId) return [];
+    try {
+      return await this.db.listDocumentsByLeave(leaveId);
+    } catch (e) {
+      console.error('[FileService] getFiles error', e.message);
+      throw e;
+    }
   }
 
   async getFile(leaveId, fileId) {
-    return this.db.findDocument(leaveId, fileId);
+    if (!leaveId || !fileId) return null;
+    try {
+      return await this.db.findDocument(leaveId, fileId);
+    } catch (e) {
+      console.error('[FileService] getFile error', e.message);
+      return null;
+    }
   }
 
   async deleteFile(leaveId, fileId, userId) {
+    if (!leaveId || !fileId || !userId) return null;
     const doc = await this.db.findDocument(leaveId, fileId);
     if (!doc) return null;
     if (doc.uploaded_by !== userId) return null;
@@ -96,6 +142,7 @@ class FileService {
         const { error } = await supabase.storage.from('leave-documents').remove([doc.file_path]);
         if (error) {
           console.error('[FileService] Supabase remove error:', error.message);
+          // Don't fail delete if storage remove fails — still soft delete DB record for UX
         }
       } catch (e) {
         console.error('[FileService] Supabase remove exception:', e.message);
@@ -103,14 +150,27 @@ class FileService {
     } else {
       // Local — ลบไฟล์บน disk
       const fullPath = path.resolve(UPLOAD_PATH, doc.file_path);
+      // Path traversal guard
+      if (!fullPath.startsWith(path.resolve(UPLOAD_PATH))) {
+        console.error('[FileService] delete path traversal blocked', doc.file_path);
+        return null;
+      }
       try {
-        fs.unlinkSync(fullPath);
+        if (fs.existsSync(fullPath)) {
+          fs.unlinkSync(fullPath);
+        }
       } catch (e) {
+        console.warn('[FileService] unlink failed (idempotent)', e.message);
         /* file may not exist — ignore for idempotency */
       }
     }
 
-    return this.db.softDeleteDocument(fileId);
+    try {
+      return await this.db.softDeleteDocument(fileId);
+    } catch (e) {
+      console.error('[FileService] softDeleteDocument error', e.message);
+      throw e;
+    }
   }
 }
 

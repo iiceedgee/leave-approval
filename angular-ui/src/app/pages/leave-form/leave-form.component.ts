@@ -1,7 +1,7 @@
 import { Component, OnInit, OnDestroy, ViewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subject } from 'rxjs';
-import { finalize, takeUntil } from 'rxjs/operators';
+import { takeUntil } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
 import { LeaveService } from '../../services/leave.service';
 import { UploadZoneComponent } from '../../shared/upload-zone/upload-zone.component';
@@ -18,6 +18,7 @@ export class LeaveFormComponent implements OnInit, OnDestroy {
 
   isResubmit = false;
   resubmitId: string | null = null;
+  resubmitNo: string | null = null;
   tempLeaveId: string | null = null;
   isSubmitting = false;
   showUploadSection = false;
@@ -72,6 +73,7 @@ export class LeaveFormComponent implements OnInit, OnDestroy {
       this.leaveService.getLeave(this.resubmitId).pipe(
         takeUntil(this.destroy$)
       ).subscribe(l => {
+        this.resubmitNo = (l as any).request_no || null;
         this.leaveType = l.leave_type;
         this.startDate = l.start_date;
         this.endDate = l.end_date;
@@ -134,31 +136,39 @@ export class LeaveFormComponent implements OnInit, OnDestroy {
    * 2. On success, set tempLeaveId so the upload zone uses the correct leave ID
    * 3. Auto-expand the upload section
    * 4. Upload any pending files the user may have queued
-   * 5. Navigate to dashboard after a short delay
+   * 5. Navigate to dashboard after a short delay (only if upload succeeds)
    */
   private handleCreate(data: CreateLeaveRequest): void {
     this.leaveService.createLeave(data).pipe(
-      finalize(() => { this.isSubmitting = false; })
+      takeUntil(this.destroy$)
     ).subscribe({
-      next: (res) => {
+      next: async (res) => {
         this.tempLeaveId = res.id;
         this.showUploadSection = true;
-        this.msg = 'ส่งคำขอลาเรียบร้อย ✅';
-        this.isError = false;
 
         const hasPending = this.uploadZone?.pendingFiles?.length > 0;
-        const navigate = () => setTimeout(
-          () => this.router.navigate(['/dashboard']),
-          this.NAVIGATION_DELAY_MS
-        );
 
         if (hasPending) {
-          this.uploadZone.uploadAll().then(navigate).catch(navigate);
+          try {
+            await this.uploadZone.uploadAll();
+            this.msg = 'ส่งคำขอลาเรียบร้อย ✅';
+            this.isError = false;
+            this.isSubmitting = false;
+            setTimeout(() => this.router.navigate(['/dashboard']), this.NAVIGATION_DELAY_MS);
+          } catch (err: any) {
+            this.isSubmitting = false;
+            this.msg = err?.error?.message || err?.message || 'อัปโหลดไฟล์ล้มเหลว';
+            this.isError = true;
+          }
         } else {
-          navigate();
+          this.msg = 'ส่งคำขอลาเรียบร้อย ✅';
+          this.isError = false;
+          this.isSubmitting = false;
+          setTimeout(() => this.router.navigate(['/dashboard']), this.NAVIGATION_DELAY_MS);
         }
       },
       error: (err) => {
+        this.isSubmitting = false;
         this.msg = err.error?.message || 'เกิดข้อผิดพลาด';
         this.isError = true;
       },
@@ -169,24 +179,42 @@ export class LeaveFormComponent implements OnInit, OnDestroy {
    * Handles the resubmit flow:
    * 1. POST the resubmit data
    * 2. On success, upload any new pending files
-   * 3. Keep the user on the page to see the success message
+   * 3. Keep the user on the page to see the success message (only after upload succeeds)
    */
   private handleResubmit(data: CreateLeaveRequest): void {
     const id = this.resubmitId;
-    if (id === null) return;
+    if (id === null) {
+      this.isSubmitting = false;
+      this.msg = 'ไม่พบรหัสคำขอลา';
+      this.isError = true;
+      return;
+    }
 
     this.leaveService.resubmitLeave(id, data).pipe(
-      finalize(() => { this.isSubmitting = false; })
+      takeUntil(this.destroy$)
     ).subscribe({
-      next: () => {
-        this.msg = 'ส่งคำขออีกครั้งเรียบร้อย ✅';
-        this.isError = false;
+      next: async () => {
+        const hasPending = this.uploadZone?.pendingFiles?.length > 0;
 
-        if (this.uploadZone?.pendingFiles?.length > 0) {
-          this.uploadZone.uploadAll().catch(() => {});
+        if (hasPending) {
+          try {
+            await this.uploadZone.uploadAll();
+            this.msg = 'ส่งคำขออีกครั้งเรียบร้อย ✅';
+            this.isError = false;
+          } catch (err: any) {
+            this.msg = err?.error?.message || err?.message || 'อัปโหลดไฟล์ล้มเหลว';
+            this.isError = true;
+          } finally {
+            this.isSubmitting = false;
+          }
+        } else {
+          this.msg = 'ส่งคำขออีกครั้งเรียบร้อย ✅';
+          this.isError = false;
+          this.isSubmitting = false;
         }
       },
       error: (err) => {
+        this.isSubmitting = false;
         this.msg = err.error?.message || 'เกิดข้อผิดพลาด';
         this.isError = true;
       },

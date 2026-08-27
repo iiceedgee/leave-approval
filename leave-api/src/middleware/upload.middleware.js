@@ -30,9 +30,16 @@ const fileFilter = (req, file, cb) => {
   const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
   if (allowed.includes(file.mimetype)) {
     cb(null, true);
-  } else {
-    cb(new Error('อนุญาตเฉพาะไฟล์ PDF, JPG, PNG, DOCX เท่านั้น'), false);
+    return;
   }
+  // Fallback: some browsers/OS report .docx as octet-stream or zip; allow by extension
+  const ext = path.extname(file.originalname).toLowerCase();
+  const genericMimes = ['application/octet-stream', 'application/zip'];
+  if (ext === '.docx' && genericMimes.includes(file.mimetype)) {
+    cb(null, true);
+    return;
+  }
+  cb(new Error('อนุญาตเฉพาะไฟล์ PDF, JPG, PNG, DOCX เท่านั้น'), false);
 };
 
 const upload = multer({

@@ -10,7 +10,7 @@ UPDATE leave_status_history SET status_code='SU' WHERE status_code='F';
 ALTER TABLE leave_requests DROP CONSTRAINT IF EXISTS leave_requests_current_status_check;
 ALTER TABLE leave_requests ALTER COLUMN current_status TYPE VARCHAR(2) USING current_status::VARCHAR(2);
 ALTER TABLE leave_requests ALTER COLUMN current_status SET DEFAULT 'SU';
-ALTER TABLE leave_requests ADD CONSTRAINT leave_requests_current_status_check CHECK (current_status IN ('SU','DC','VC','MA','AP','SB','CX','RJ'));
+ALTER TABLE leave_requests ADD CONSTRAINT leave_requests_current_status_check CHECK (current_status IN ('SU','DC','MA','AP','SB','CX','RJ'));
 
 -- 3. ลบ trigger ผิดถ้ามี (กันย้อนกลับเป็น F)
 DROP TRIGGER IF EXISTS trg_set_default_F ON leave_requests;

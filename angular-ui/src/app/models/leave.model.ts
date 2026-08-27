@@ -2,6 +2,7 @@ import { StatusCode } from './status';
 
 export interface Leave {
   id: string;
+  request_no?: string;
   user_id: string;
   leave_type: string;
   start_date: string;

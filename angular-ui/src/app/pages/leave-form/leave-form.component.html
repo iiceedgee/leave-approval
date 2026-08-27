@@ -23,7 +23,7 @@
   <!-- ── Resubmit Banner ── -->
   <div class="resubmit-banner" *ngIf="isResubmit">
     <i class="fa-solid fa-pen-to-square"></i>
-    คำขอ #{{ resubmitId }} ถูกส่งกลับ กรุณาแก้ไขแล้วส่งใหม่
+    คำขอ #{{ resubmitNo || resubmitId?.slice(0,8) }} ถูกส่งกลับ กรุณาแก้ไขแล้วส่งใหม่
   </div>
 
   <!-- ── Form Card ── -->

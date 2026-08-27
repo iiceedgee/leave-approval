@@ -2,6 +2,7 @@
  * Stepper Service — centralized status via ../constants/status
  * แทน cms_status ของ EEC แบบ in-code ไม่ต้อง JOIN
  * STATUS กลางอยู่ที่ leave-api/src/constants/status.js
+ * Simplified flow: SU -> DC -> MA -> AP (VC deprecated, kept for legacy)
  */
 'use strict';
 
@@ -10,6 +11,7 @@ const { STATUS, getStatusThai } = require('../constants/status');
 const STEPPER_STEPS = [
   { seq: 1, icon: 'fa-solid fa-file-pen',         name: 'ยื่นคำขอ',            status: STATUS.SU.code },
   { seq: 2, icon: 'fa-solid fa-file-shield',      name: 'ตรวจสอบครบถ้วน',      status: STATUS.DC.code },
+  // VC step kept for backward compat with legacy leaves, displayed as pending/done when MA/AP
   { seq: 3, icon: 'fa-solid fa-file-circle-check', name: 'ตรวจสอบถูกต้อง',      status: STATUS.VC.code },
   { seq: 4, icon: 'fa-solid fa-user-check',       name: 'หัวหน้าอนุมัติ',       status: STATUS.MA.code },
   { seq: 5, icon: 'fa-solid fa-circle-check',     name: 'เสร็จสิ้น',            status: STATUS.AP.code },
@@ -74,6 +76,7 @@ function getStepperSteps(currentStatus, flagSendBack, history, role) {
     }
 
     if (currentStatus === STATUS.MA.code) {
+      // Simplified: DC->MA skips VC, so consider VC as done as well
       if (index <= 2) return 'done';
       if (index === 3) return 'current';
       return 'pending';
@@ -113,7 +116,7 @@ function buildHistoryTimeline(history) {
 
 function getApprovableSteps(role) {
   if (role === 'mgr') return ['หัวหน้าอนุมัติ'];
-  if (role === 'hr') return ['ตรวจสอบครบถ้วน', 'ตรวจสอบถูกต้อง'];
+  if (role === 'hr') return ['ตรวจสอบครบถ้วน']; // simplified: only pretemp
   return [];
 }
 

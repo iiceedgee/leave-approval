@@ -1,6 +1,6 @@
 <div class="page-container" *ngIf="!loading && leave">
   <div class="header">
-    <h2>คำขอลา #{{ leave.id }}</h2>
+    <h2>คำขอลา #{{ leave.request_no || leave.id.slice(0,8) }}</h2>
     <div class="header-right">
       <app-notification-bell></app-notification-bell>
       <span class="badge">{{ user?.fullName }} ({{ user?.role }})</span>
@@ -45,6 +45,7 @@
       [leaveId]="leave.id"
       [uploadFn]="onVerificationUpload.bind(this)"
       [canDelete]="true"
+      (uploadComplete)="onVerificationUploadComplete()"
     ></app-upload-zone>
     <textarea
       class="remark-input"
@@ -55,25 +56,6 @@
     <div class="action-btns">
       <button class="btn btn-approve" (click)="handlePretempPass()">✓ เอกสารครบถ้วน</button>
       <button class="btn btn-sendback" (click)="handlePretempSendBack()">↺ ส่งกลับแก้ไข</button>
-    </div>
-  </div>
-
-  <div class="action-panel" *ngIf="canDoTemp">
-    <h4>ตรวจสอบเอกสาร (ความถูกต้อง)</h4>
-    <app-upload-zone
-      [leaveId]="leave.id"
-      [uploadFn]="onVerificationUpload.bind(this)"
-      [canDelete]="true"
-    ></app-upload-zone>
-    <textarea
-      class="remark-input"
-      rows="2"
-      [(ngModel)]="tempRemark"
-      placeholder="หมายเหตุ"
-    ></textarea>
-    <div class="action-btns">
-      <button class="btn btn-approve" (click)="handleTempPass()">✓ เอกสารถูกต้อง</button>
-      <button class="btn btn-sendback" (click)="handleTempSendBack()">↺ ส่งกลับแก้ไข</button>
     </div>
   </div>
 
@@ -105,6 +87,7 @@
       [uploadFn]="onEmpUpload.bind(this)"
       [deleteFn]="onEmpDelete.bind(this)"
       [canDelete]="canEmpDelete.bind(this)"
+      (uploadComplete)="onEmpUploadComplete()"
     ></app-upload-zone>
   </div>
 

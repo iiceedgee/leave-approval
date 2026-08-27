@@ -79,11 +79,34 @@ class SupabaseStore {
     return user;
   }
 
+  async _nextRequestNo() {
+    const year = new Date().getFullYear();
+    const prefix = `LV-${year}-`;
+    try {
+      const { data, error } = await this.supabase.from('leave_requests').select('request_no').like('request_no', `${prefix}%`).order('request_no', { ascending: false }).limit(1);
+      if (!error && data && data.length > 0 && data[0].request_no) {
+        const m = data[0].request_no.match(/-(\d+)$/);
+        if (m) return `${prefix}${String(parseInt(m[1], 10) + 1).padStart(4, '0')}`;
+      }
+    } catch {}
+    // Fallback: นับจำนวนแถวปีนี้ +1
+    try {
+      const { count } = await this.supabase.from('leave_requests').select('*', { count: 'exact', head: true }).like('request_no', `${prefix}%`);
+      return `${prefix}${String((count || 0) + 1).padStart(4, '0')}`;
+    } catch {
+      return `${prefix}0001`;
+    }
+  }
+
   // ---- leaves ----
   // insert + .select().single() = ส่งเข้าแล้วขอข้อมูลที่ insert กลับมา
   // (id, created_at ฯลฯ ที่ database สร้างให้)
   async createLeave(data) {
     // Enforce defaults + whitelist — กัน client ส่ง current_status ผิดๆ มาทับ และกัน DB default ผิด (F) ของ prod เก่า
+    // ถ้ายังไม่มี request_no ให้ gen แบบรันไม่ซ้ำ LV-YYYY-XXXX
+    if (!data.request_no) {
+      try { data.request_no = await this._nextRequestNo(); } catch {}
+    }
     const payload = {
       current_status: 'SU',
       flag_send_back: 'N',
@@ -91,23 +114,42 @@ class SupabaseStore {
       ...data,
     };
     // ถ้า client ส่ง SU/DC ฯลฯ มาให้ใช้ตามนั้น แต่ถ้าส่ง F หรือค่าผิดให้ fallback SU
-    const allowed = ['SU','DC','VC','MA','AP','SB','CX','RJ'];
+    const allowed = ['SU','DC','MA','AP','SB','CX','RJ'];
     if (!allowed.includes(payload.current_status)) payload.current_status = 'SU';
     // รองรับ prod เก่าที่ default เป็น F — ถ้า payload มี F ให้แก้เป็น SU ก่อน insert
     if (payload.current_status === 'F') payload.current_status = 'SU';
-    const { data: leave, error } = await this.supabase
-      .from('leave_requests')
-      .insert(payload)
-      .select()
-      .single();
-    if (error) { console.error('[DB] createLeave error:', JSON.stringify(error, null, 2)); const e=new Error(error.message); e.code=error.code; e.details=error.details; e.hint=error.hint; throw e; }
-    // Defensive: ถ้า DB ยังคืน F (trigger/default ผิด) ให้แก้ใน code
-    if (leave && leave.current_status === 'F') {
-      console.warn('[DB] createLeave returned F — auto patch to SU', leave.id);
-      const patched = await this.updateLeave(leave.id, { current_status: 'SU' });
-      return patched || { ...leave, current_status: 'SU' };
+    // Retry 3 ครั้งกรณีเลขซ้ำ (unique violation) จาก concurrent
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const { data: leave, error } = await this.supabase
+        .from('leave_requests')
+        .insert(payload)
+        .select()
+        .single();
+      if (!error) {
+        if (leave && leave.current_status === 'F') {
+          console.warn('[DB] createLeave returned F — auto patch to SU', leave.id);
+          const patched = await this.updateLeave(leave.id, { current_status: 'SU' });
+          return patched || { ...leave, current_status: 'SU' };
+        }
+        return leave;
+      }
+      // ถ้า error เพราะ request_no ซ้ำ (code 23505) ให้ gen ใหม่แล้วลองใหม่
+      if (error.code === '23505' && String(error.message).includes('request_no')) {
+        console.warn('[DB] request_no duplicate, retry', payload.request_no);
+        payload.request_no = await this._nextRequestNo();
+        continue;
+      }
+      // ถ้า error เพราะคอลัมน์ request_no ยังไม่มี (DB ยังไม่ migration) ให้ลองแบบไม่มี request_no
+      if (error.code === '42703' || String(error.message).includes('request_no')) {
+        console.warn('[DB] request_no column missing, fallback insert without it');
+        delete payload.request_no;
+        const { data: leave2, error: err2 } = await this.supabase.from('leave_requests').insert(payload).select().single();
+        if (!err2) return leave2;
+        console.error('[DB] createLeave error:', JSON.stringify(error, null, 2)); const e=new Error(err2.message); e.code=err2.code; e.details=err2.details; e.hint=err2.hint; throw e;
+      }
+      console.error('[DB] createLeave error:', JSON.stringify(error, null, 2)); const e=new Error(error.message); e.code=error.code; e.details=error.details; e.hint=error.hint; throw e;
     }
-    return leave;
+    throw new Error('ไม่สามารถสร้างเลขที่คำขอได้ กรุณาลองใหม่');
   }
 
   _normalizeLeave(leave) {

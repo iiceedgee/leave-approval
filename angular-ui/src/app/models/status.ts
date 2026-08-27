@@ -8,15 +8,18 @@
  *  - ได้ Type-safety ผ่าน `StatusCode`
  *  - ลดการ query DB สำหรับสถานะที่คงที่ตาม workflow
  *
- * Workflow หลัก: SU -> DC -> VC -> MA -> AP
- *                DC/VC/MA -> SB (ส่งกลับแก้ไข) -> SU
- *                SU/VC/MA -> CX/RJ (ยกเลิก/ไม่อนุมัติ)
+ * Workflow หลัก (Simplified — VC removed):
+ *   SU -> DC -> MA -> AP
+ *   DC/MA -> SB (ส่งกลับแก้ไข) -> SU
+ *   DC/MA -> RJ (ไม่อนุมัติ) / SU -> CX (ยกเลิก)
+ *   VC: @deprecated legacy — kept for backward compat with existing leaves, not used in new flow
  */
 
 export const STATUS = {
   SU: { code: 'SU', th: 'ยื่นคำขอ', en: 'Submitted', desc: 'emp ยื่นคำขอ -> DC' },
-  DC: { code: 'DC', th: 'รอตรวจสอบเอกสาร', en: 'DocCheck', desc: 'รอตรวจสอบความครบถ้วนของเอกสาร' },
-  VC: { code: 'VC', th: 'รอตรวจสอบความถูกต้อง', en: 'VerifyCheck', desc: 'รอตรวจสอบความถูกต้อง' },
+  DC: { code: 'DC', th: 'รอตรวจสอบเอกสาร', en: 'DocCheck', desc: 'รอตรวจสอบความครบถ้วนของเอกสาร -> MA/SU (simplified)' },
+  /** @deprecated VC removed — kept for legacy leaves, use DC->MA instead */
+  VC: { code: 'VC', th: 'รอตรวจสอบความถูกต้อง', en: 'VerifyCheck', desc: 'รอตรวจสอบความถูกต้อง (deprecated)' },
   MA: { code: 'MA', th: 'รอหัวหน้าอนุมัติ', en: 'ManagerApproval', desc: 'รอหัวหน้าอนุมัติ' },
   AP: { code: 'AP', th: 'อนุมัติแล้ว', en: 'Approved', desc: 'อนุมัติแล้ว' },
   SB: { code: 'SB', th: 'ส่งกลับแก้ไข', en: 'SendBack', desc: 'ส่งกลับแก้ไข' },

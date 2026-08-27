@@ -97,11 +97,15 @@ export class LeaveService {
     return this.http.post(`${this.apiUrl}/approval/${id}/pretemp/sendback`, { remark });
   }
 
+  /** @deprecated VC merged into DC — use pretempPass (DC->MA) instead */
   tempPass(id: string, remark: string): Observable<any> {
-    return this.http.post(`${this.apiUrl}/approval/${id}/temp/pass`, { remark });
+    console.warn('[LeaveService] tempPass deprecated: VC merged into DC, delegating to pretempPass');
+    return this.pretempPass(id, remark);
   }
 
+  /** @deprecated VC merged into DC — use pretempSendBack instead */
   tempSendBack(id: string, remark: string): Observable<any> {
-    return this.http.post(`${this.apiUrl}/approval/${id}/temp/sendback`, { remark });
+    console.warn('[LeaveService] tempSendBack deprecated: VC merged into DC, delegating to pretempSendBack');
+    return this.pretempSendBack(id, remark);
   }
 }

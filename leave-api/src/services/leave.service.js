@@ -14,6 +14,7 @@ class LeaveService {
 
   // พนักงานยื่นคำขอลา → status = SU
   async create(userId, data) {
+    if (!userId) throw Object.assign(new Error('ไม่พบผู้ใช้'), { statusCode: 401 });
     const allowed = Object.keys(require('../config/leave-quota'));
     if (!data.leave_type || !allowed.includes(data.leave_type.trim())) throw Object.assign(new Error(`leave_type ต้องเป็น ${allowed.join(', ')}`), {statusCode:400});
     if (!data.start_date || !data.end_date || isNaN(Date.parse(data.start_date)) || isNaN(Date.parse(data.end_date))) throw Object.assign(new Error('รูปแบบวันที่ไม่ถูกต้อง (YYYY-MM-DD)'), {statusCode:400});
@@ -54,6 +55,7 @@ class LeaveService {
     } else if (role === 'mgr') {
       // manager เห็น leaves ของ employees ใน department เดียวกัน
       const mgr = allUsers.find(u => u.id === userId);
+      if (!mgr) return [];
       leaves = allLeaves.filter(l => {
         const u = allUsers.find(x => x.id === l.user_id);
         return u && u.department === mgr.department;
@@ -68,11 +70,13 @@ class LeaveService {
   }
 
   async getById(id) {
+    if (!id) return null;
     return this.db.getLeaveById(id);
   }
 
   // ★ อนุมัติ — ต้อง status MA และ role=mgr เท่านั้น (หัวหน้าคนเดียว)
   async approve(leaveId, userId, role, remark) {
+    if (!leaveId || !userId) return { error: 'พารามิเตอร์ไม่ครบ' };
     if (role !== 'mgr') return { error: 'เฉพาะหัวหน้า (mgr) เท่านั้นที่อนุมัติได้' };
     const leave = await this.db.getLeaveById(leaveId);
     if (!leave) return { error: 'ไม่พบคำขอ' };
@@ -80,12 +84,24 @@ class LeaveService {
     return this.transition(leaveId, userId, role, STATUS.AP.code, remark);
   }
 
-  // ★ ส่งกลับแก้ไข — DC/VC ให้ hr/mgr, MA ให้ mgr คนเดียว
+  // ★ ส่งกลับแก้ไข — DC ให้ hr/mgr, MA ให้ mgr คนเดียว (VC removed, but legacy VC still supported deprecated)
   async sendBack(leaveId, userId, role, remark) {
+    if (!leaveId || !userId) return { error: 'พารามิเตอร์ไม่ครบ' };
     const leave = await this.db.getLeaveById(leaveId);
     if (!leave) return { error: 'ไม่พบคำขอ' };
-    if (![STATUS.DC.code, STATUS.VC.code, STATUS.MA.code].includes(leave.current_status)) return { error: 'ไม่สามารถส่งกลับได้ สถานะปัจจุบันไม่รอการตรวจสอบ (DC/VC/MA)' };
+
+    // Simplified allowed: DC and MA (VC deprecated — keep for backward compat warning)
+    const allowedStatuses = [STATUS.DC.code, STATUS.MA.code];
+    // Legacy VC support: allow but warn
+    const isLegacyVC = leave.current_status === 'VC';
+    if (!allowedStatuses.includes(leave.current_status) && !isLegacyVC) {
+      return { error: 'ไม่สามารถส่งกลับได้ สถานะปัจจุบันไม่รอการตรวจสอบ (DC/MA)' };
+    }
+    if (isLegacyVC) {
+      console.warn('[leave.service] sendBack: legacy VC status — allowing for backward compat');
+    }
     if (leave.current_status === STATUS.MA.code && role !== 'mgr') return { error: 'เฉพาะหัวหน้าเท่านั้นที่ส่งกลับที่ MA ได้' };
+    if (!remark || !String(remark).trim()) return { error: 'กรุณาระบุเหตุผลที่ส่งกลับ' };
 
     const updated = await this.db.updateLeave(leaveId, {
       current_status: STATUS.SU.code,
@@ -104,29 +120,44 @@ class LeaveService {
     return updated;
   }
 
-  // ★ ไม่อนุมัติ — VC ให้ hr/mgr, MA ให้ mgr คนเดียว
+  // ★ ไม่อนุมัติ — DC ให้ hr/mgr, MA ให้ mgr คนเดียว (VC removed)
   async reject(leaveId, userId, role, remark) {
+    if (!leaveId || !userId) return { error: 'พารามิเตอร์ไม่ครบ' };
     const leave = await this.db.getLeaveById(leaveId);
     if (!leave) return { error: 'ไม่พบคำขอ' };
-    if (![STATUS.VC.code, STATUS.MA.code].includes(leave.current_status)) return { error: 'ไม่สามารถไม่อนุมัติได้ สถานะปัจจุบันไม่ใช่รอตรวจสอบหรือรอหัวหน้าตรวจสอบ (VC/MA)' };
+
+    // Simplified: DC and MA can reject (VC removed but legacy VC allowed deprecated)
+    const allowedStatuses = [STATUS.DC.code, STATUS.MA.code];
+    const isLegacyVC = leave.current_status === 'VC';
+    if (!allowedStatuses.includes(leave.current_status) && !isLegacyVC) {
+      return { error: 'ไม่สามารถไม่อนุมัติได้ สถานะปัจจุบันไม่ใช่รอตรวจสอบหรือรอหัวหน้าตรวจสอบ (DC/MA)' };
+    }
+    if (isLegacyVC) {
+      console.warn('[leave.service] reject: legacy VC status — allowing for backward compat');
+    }
     if (leave.current_status === STATUS.MA.code && role !== 'mgr') return { error: 'เฉพาะหัวหน้าเท่านั้นที่ไม่อนุมัติที่ MA ได้' };
+    if (!remark || !String(remark).trim()) return { error: 'กรุณาระบุเหตุผลที่ไม่อนุมัติ' };
     return this.transition(leaveId, userId, role, STATUS.RJ.code, remark);
   }
 
   // ★ ยกเลิก — เฉพาะ status SU
   async cancel(leaveId, userId, role, remark) {
+    if (!leaveId || !userId) return { error: 'พารามิเตอร์ไม่ครบ' };
     const leave = await this.db.getLeaveById(leaveId);
     if (!leave) return { error: 'ไม่พบคำขอ' };
     if (leave.current_status !== STATUS.SU.code) return { error: 'ไม่สามารถยกเลิกได้ สถานะปัจจุบันไม่ใช่รอดำเนินการ (SU)' };
+    // Only owner or hr/mgr? Currently any role can cancel if status SU? Keep check for emp owner is done at route level.
     return this.transition(leaveId, userId, role, STATUS.CX.code, remark);
   }
 
   // แก้ไขหลังจากถูกส่งกลับ (flag_send_back → N)
   async resubmit(leaveId, userId, data) {
+    if (!leaveId || !userId) return null;
     const leave = await this.db.getLeaveById(leaveId);
     if (!leave) return null;
     if (leave.user_id !== userId) return null;
     if (leave.flag_send_back !== 'Y') return null;
+    if (leave.current_status !== STATUS.SU.code) return null;
 
     const updateFields = { current_status: STATUS.DC.code, flag_send_back: 'N' };
     if (data.leave_type) updateFields.leave_type = data.leave_type;
@@ -149,6 +180,7 @@ class LeaveService {
 
   // logic กลางสำหรับเปลี่ยน status + บันทึก history
   async transition(leaveId, userId, role, targetStatus, remark) {
+    if (!leaveId || !userId || !targetStatus) return null;
     const leave = await this.db.getLeaveById(leaveId);
     if (!leave) return null;
 
@@ -167,6 +199,7 @@ class LeaveService {
 
   // ★ ดึง stepper steps
   async getStepper(leaveId) {
+    if (!leaveId) return stepperService.getStepperSteps(STATUS.SU.code, 'N', []);
     const leave = await this.db.getLeaveById(leaveId);
     if (!leave) return stepperService.getStepperSteps(STATUS.SU.code, 'N', []);
 
@@ -176,10 +209,12 @@ class LeaveService {
 
   // ★ ดึง history timeline
   async getHistory(leaveId) {
+    if (!leaveId) return [];
     return this._historyWithNames(leaveId).then(h => stepperService.buildHistoryTimeline(h));
   }
 
   async getHistoryRaw(leaveId) {
+    if (!leaveId) return [];
     return this._historyWithNames(leaveId);
   }
 
@@ -187,7 +222,7 @@ class LeaveService {
     const history = await this.db.listHistoryByLeave(leaveId);
     const allUsers = await this.db.listUsers();
 
-    return history.map(h => {
+    return (history || []).map(h => {
       const user = allUsers.find(u => u.id === h.action_by);
       return { ...h, action_by_name: user ? user.full_name : '' };
     });
@@ -195,8 +230,10 @@ class LeaveService {
 
   // ★ คำนวณจำนวนวันลา (รวมวันเริ่มต้นและวันสิ้นสุด)
   static calcLeaveDays(startDate, endDate) {
+    if (!startDate || !endDate) return 0;
     const start = new Date(startDate);
     const end = new Date(endDate);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return 0;
     const startUTC = Date.UTC(start.getFullYear(), start.getMonth(), start.getDate());
     const endUTC = Date.UTC(end.getFullYear(), end.getMonth(), end.getDate());
     return Math.floor((endUTC - startUTC) / (1000 * 60 * 60 * 24)) + 1;
@@ -204,6 +241,7 @@ class LeaveService {
 
   // ★ ดึงประวัติการลาของพนักงานตามปี
   async getMyHistory(userId, year) {
+    if (!userId) return [];
     const targetYear = year || new Date().getFullYear();
     const allLeaves = await this.db.listLeaves();
     return allLeaves
@@ -217,6 +255,7 @@ class LeaveService {
 
   // ★ ดึงยอดคงเหลือการลาของพนักงานตามปี
   async getMyBalance(userId, year) {
+    if (!userId) return [];
     const targetYear = year || new Date().getFullYear();
     const allLeaves = await this.db.listLeaves();
     const approvedLeaves = allLeaves.filter(l =>

@@ -67,14 +67,28 @@ class InMemoryStore {
     return user;
   }
 
+  _nextRequestNo() {
+    const year = new Date().getFullYear();
+    const prefix = `LV-${year}-`;
+    let max = 0;
+    for (const l of this.leaves) {
+      if (l.request_no && l.request_no.startsWith(prefix)) {
+        const m = l.request_no.match(/-(\d+)$/);
+        if (m) max = Math.max(max, parseInt(m[1], 10));
+      }
+    }
+    return `${prefix}${String(max + 1).padStart(4, '0')}`;
+  }
+
   // ---- leaves ----
   async createLeave(data) {
     // Whitelist — กัน client ส่ง current_status=F มาทับ SU
-    const { current_status, flag_send_back, send_back_count, ...safe } = data;
-    const allowed = ['SU','DC','VC','MA','AP','SB','CX','RJ'];
+    const { current_status, flag_send_back, send_back_count, request_no, ...safe } = data;
+    const allowed = ['SU','DC','MA','AP','SB','CX','RJ'];
     const finalStatus = allowed.includes(current_status) ? current_status : 'SU';
     const leave = {
       id: this._uuid(),
+      request_no: request_no || this._nextRequestNo(),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       current_status: finalStatus === 'F' ? 'SU' : finalStatus,

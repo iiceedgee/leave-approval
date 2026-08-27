@@ -28,6 +28,7 @@ export class LeaveDetailComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
 
   pretempRemark = '';
+  /** @deprecated VC flow removed — kept for backward compat, do not use in new code */
   tempRemark = '';
   approvalRemark = '';
 
@@ -42,6 +43,11 @@ export class LeaveDetailComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.user = this.auth.getUser();
     const id = this.route.snapshot.paramMap.get('id')!;
+    if (!id) {
+      this.toast.error('ไม่พบรหัสคำขอ');
+      this.loading = false;
+      return;
+    }
     this.loadData(id);
   }
 
@@ -55,47 +61,82 @@ export class LeaveDetailComponent implements OnInit, OnDestroy {
     }));
   }
 
-  private loadData(id: string): void {
+  /** @public — also used by uploadComplete handlers to refresh status after SU->DC */
+  loadData(id: string): void {
+    if (!id || typeof id !== 'string') {
+      this.loading = false;
+      return;
+    }
     this.loading = true;
     this.leaveService.getLeave(id).pipe(takeUntil(this.destroy$)).subscribe({
       next: (leave) => {
+        if (!leave) {
+          this.loading = false;
+          this.toast.error('ไม่พบข้อมูลคำขอ');
+          return;
+        }
         this.leave = leave;
         forkJoin([
           this.leaveService.getStepper(id),
           this.leaveService.getHistory(id),
         ]).pipe(takeUntil(this.destroy$)).subscribe({
           next: ([steps, items]) => {
-            this.stepperSteps = steps;
-            this.timelineItems = items;
+            this.stepperSteps = Array.isArray(steps) ? steps : [];
+            this.timelineItems = Array.isArray(items) ? items : [];
             this.loading = false;
           },
-          error: () => {
+          error: (err) => {
+            console.error('[leave-detail] load stepper/history failed', err);
             this.loading = false;
           },
         });
       },
-      error: () => {
+      error: (err) => {
+        console.error('[leave-detail] load leave failed', err);
         this.loading = false;
+        this.toast.error(err?.error?.message || err?.message || 'โหลดข้อมูลล้มเหลว');
       },
     });
+  }
+
+  /** Reload current leave — convenience wrapper for uploadComplete events */
+  reloadLeave(): void {
+    if (this.leave?.id) {
+      this.loadData(this.leave.id);
+    }
+  }
+
+  /** Called by <app-upload-zone> after successful emp upload */
+  onEmpUploadComplete(): void {
+    // Emp upload at SU triggers backend SU->DC; need to refresh status/stepper
+    // Do immediate reload plus safety delayed reload to handle eventual consistency
+    this.reloadLeave();
+  }
+
+  /** Called by <app-upload-zone> after HR/MGR verification upload at DC */
+  onVerificationUploadComplete(): void {
+    this.reloadLeave();
   }
 
   get canApprove(): boolean {
     return this.user?.role === 'mgr' && this.leave?.current_status === STATUS.MA.code;
   }
 
-  // ตรวจเอกสารได้ทั้ง HR/MGR, แต่อนุมัติได้แค่ MGR (ตามสั่งล่าสุด)
+  // ตรวจเอกสารได้ทั้ง HR/MGR, แต่อนุมัติได้แค่ MGR — simplified flow DC -> MA (no VC)
   get canDoPretemp(): boolean {
     return (this.user?.role === 'hr' || this.user?.role === 'mgr') && this.leave?.current_status === STATUS.DC.code;
   }
 
+  // VC flow removed — kept for type compat only, always false now.
+  // Use canDoPretemp (DC -> MA) instead.
+  /** @deprecated */
   get canDoTemp(): boolean {
-    return (this.user?.role === 'hr' || this.user?.role === 'mgr') && this.leave?.current_status === STATUS.VC.code;
+    return false;
   }
 
   get canSendBack(): boolean {
-    // HR/MGR ส่งกลับได้ที่ DC/VC, ส่วน MA ให้ MGR เท่านั้น
-    if (this.leave?.current_status === STATUS.DC.code || this.leave?.current_status === STATUS.VC.code) {
+    // HR/MGR ส่งกลับได้ที่ DC, ส่วน MA ให้ MGR เท่านั้น (VC removed)
+    if (this.leave?.current_status === STATUS.DC.code) {
       return this.user?.role === 'hr' || this.user?.role === 'mgr';
     }
     if (this.leave?.current_status === STATUS.MA.code) {
@@ -105,8 +146,8 @@ export class LeaveDetailComponent implements OnInit, OnDestroy {
   }
 
   get canReject(): boolean {
-    // VC ให้ HR/MGR ไม่อนุมัติได้, MA ให้ MGR เท่านั้น
-    if (this.leave?.current_status === STATUS.VC.code) {
+    // Simplified: DC ให้ HR/MGR ไม่อนุมัติได้, MA ให้ MGR เท่านั้น (VC removed)
+    if (this.leave?.current_status === STATUS.DC.code) {
       return this.user?.role === 'hr' || this.user?.role === 'mgr';
     }
     if (this.leave?.current_status === STATUS.MA.code) {
@@ -128,9 +169,26 @@ export class LeaveDetailComponent implements OnInit, OnDestroy {
   }
 
   get canUploadDoc(): boolean {
-    return this.user?.role === 'emp' &&
-      this.user?.id === this.leave?.user_id &&
-      (this.leave?.current_status === STATUS.SU.code || this.leave?.flag_send_back === 'Y');
+    // Emp can upload at SU (initial) and DC (until pretemp passes to MA)
+    // Also when flag_send_back=Y (needs to re-upload after send-back)
+    // Block terminal states MA/AP/RJ/CX explicitly
+    if (!this.leave || !this.user) return false;
+    if (this.user?.role !== 'emp') return false;
+    if (this.user?.id !== this.leave?.user_id) return false;
+
+    const status = this.leave.current_status;
+    // Terminal — cannot upload after manager stage or final states
+    if ([STATUS.MA.code, STATUS.AP.code, STATUS.RJ.code, STATUS.CX.code].includes(status as any)) {
+      // Even with flag Y, MA/AP/RJ/CX should not allow direct upload (must resubmit via form)
+      // But SU+Y is not terminal, so it will fall through to flag check above? Actually SU+Y is SU status, not terminal.
+      // So block here only for terminal statuses.
+      return false;
+    }
+
+    if (this.leave.flag_send_back === 'Y') return true;
+    if (status === STATUS.SU.code) return true;
+    if (status === STATUS.DC.code) return true;
+    return false;
   }
 
   get showApprovalPanel(): boolean {
@@ -167,21 +225,21 @@ export class LeaveDetailComponent implements OnInit, OnDestroy {
     }
     const confirmed = await showConfirmDialog({
       title: 'ยืนยันตรวจสอบความครบถ้วน',
-      message: 'ยืนยันว่าเอกสารครบถ้วนถูกต้อง?',
+      message: 'ยืนยันว่าเอกสารครบถ้วนถูกต้อง? (จะส่งต่อให้หัวหน้าอนุมัติ)',
     });
     if (!confirmed) return;
     try {
       await this.leaveService.pretempPass(id, this.pretempRemark).toPromise();
-      this.toast.success('ตรวจสอบความครบถ้วนผ่านแล้ว');
+      this.toast.success('ตรวจสอบความครบถ้วนผ่านแล้ว — ส่งต่อรอหัวหน้าอนุมัติ');
       setTimeout(() => this.loadData(id), 800);
     } catch (err: any) {
-      this.toast.error(err.message || 'เกิดข้อผิดพลาด');
+      this.toast.error(err?.error?.message || err?.message || 'เกิดข้อผิดพลาด');
     }
   }
 
   async handlePretempSendBack(): Promise<void> {
     const id = this.leave!.id;
-    if (!this.pretempRemark) {
+    if (!this.pretempRemark || !this.pretempRemark.trim()) {
       this.toast.warning('กรุณาระบุเหตุผลที่ส่งกลับ');
       return;
     }
@@ -195,56 +253,27 @@ export class LeaveDetailComponent implements OnInit, OnDestroy {
       this.toast.success('ส่งกลับแก้ไขเรียบร้อย');
       setTimeout(() => this.loadData(id), 800);
     } catch (err: any) {
-      this.toast.error(err.message || 'เกิดข้อผิดพลาด');
+      this.toast.error(err?.error?.message || err?.message || 'เกิดข้อผิดพลาด');
     }
   }
 
+  /**
+   * @deprecated VC flow removed — use handlePretempPass (DC->MA) instead.
+   * Kept for backward compat; delegates to pretemp.
+   */
   async handleTempPass(): Promise<void> {
-    const id = this.leave!.id;
-    if (await this.guardHrBlockedAtM()) return;
-    let files: UploadedFile[] | undefined;
-    try {
-      files = await this.leaveService.getFiles(id).toPromise();
-    } catch {}
-    if (!files || files.length === 0) {
-      const proceed = await showConfirmDialog({
-        title: 'ยังไม่มีเอกสารแนบ',
-        message: 'ยังไม่มีเอกสารแนบในคำขอนี้ ต้องการดำเนินการต่อหรือไม่?',
-      });
-      if (!proceed) return;
-    }
-    const confirmed = await showConfirmDialog({
-      title: 'ยืนยันตรวจสอบความถูกต้อง',
-      message: 'ยืนยันว่าเอกสารถูกต้อง?',
-    });
-    if (!confirmed) return;
-    try {
-      await this.leaveService.tempPass(id, this.tempRemark).toPromise();
-      this.toast.success('ตรวจสอบความถูกต้องผ่านแล้ว');
-      setTimeout(() => this.loadData(id), 800);
-    } catch (err: any) {
-      this.toast.error(err.message || 'เกิดข้อผิดพลาด');
-    }
+    console.warn('[deprecated] handleTempPass called — VC flow removed, delegating to pretempPass');
+    return this.handlePretempPass();
   }
 
+  /**
+   * @deprecated VC flow removed — use handlePretempSendBack (DC->SU) instead.
+   */
   async handleTempSendBack(): Promise<void> {
-    const id = this.leave!.id;
-    if (!this.tempRemark) {
-      this.toast.warning('กรุณาระบุเหตุผลที่ส่งกลับ');
-      return;
-    }
-    const confirmed = await showConfirmDialog({
-      title: 'ยืนยันส่งกลับแก้ไข',
-      message: 'ยืนยันส่งกลับแก้ไขเอกสาร?',
-    });
-    if (!confirmed) return;
-    try {
-      await this.leaveService.tempSendBack(id, this.tempRemark).toPromise();
-      this.toast.success('ส่งกลับแก้ไขเรียบร้อย');
-      setTimeout(() => this.loadData(id), 800);
-    } catch (err: any) {
-      this.toast.error(err.message || 'เกิดข้อผิดพลาด');
-    }
+    console.warn('[deprecated] handleTempSendBack called — VC flow removed, delegating to pretempSendBack');
+    // map tempRemark -> pretempRemark for compat
+    if (this.tempRemark && !this.pretempRemark) this.pretempRemark = this.tempRemark;
+    return this.handlePretempSendBack();
   }
 
   async handleApprove(): Promise<void> {
@@ -264,13 +293,13 @@ export class LeaveDetailComponent implements OnInit, OnDestroy {
         this.loadData(this.leave!.id);
       }, 2500);
     } catch (err: any) {
-      this.toast.error(err.message || 'เกิดข้อผิดพลาด');
+      this.toast.error(err?.error?.message || err?.message || 'เกิดข้อผิดพลาด');
     }
   }
 
   async handleSendBack(): Promise<void> {
     if (await this.guardHrBlockedAtM()) return;
-    if (!this.approvalRemark) {
+    if (!this.approvalRemark || !this.approvalRemark.trim()) {
       this.toast.warning('กรุณาระบุเหตุผลที่ส่งกลับ');
       return;
     }
@@ -284,13 +313,13 @@ export class LeaveDetailComponent implements OnInit, OnDestroy {
       this.toast.success('ส่งกลับแก้ไขเรียบร้อย');
       setTimeout(() => this.loadData(this.leave!.id), 800);
     } catch (err: any) {
-      this.toast.error(err.message || 'เกิดข้อผิดพลาด');
+      this.toast.error(err?.error?.message || err?.message || 'เกิดข้อผิดพลาด');
     }
   }
 
   async handleReject(): Promise<void> {
     if (await this.guardHrBlockedAtM()) return;
-    if (!this.approvalRemark) {
+    if (!this.approvalRemark || !this.approvalRemark.trim()) {
       this.toast.warning('กรุณาระบุเหตุผล');
       return;
     }
@@ -304,7 +333,7 @@ export class LeaveDetailComponent implements OnInit, OnDestroy {
       this.toast.success('ไม่อนุมัติสำเร็จ');
       setTimeout(() => this.loadData(this.leave!.id), 800);
     } catch (err: any) {
-      this.toast.error(err.message || 'เกิดข้อผิดพลาด');
+      this.toast.error(err?.error?.message || err?.message || 'เกิดข้อผิดพลาด');
     }
   }
 
@@ -319,12 +348,17 @@ export class LeaveDetailComponent implements OnInit, OnDestroy {
       this.toast.success('ยกเลิกคำขอเรียบร้อย');
       setTimeout(() => this.loadData(this.leave!.id), 800);
     } catch (err: any) {
-      this.toast.error(err.message || 'เกิดข้อผิดพลาด');
+      this.toast.error(err?.error?.message || err?.message || 'เกิดข้อผิดพลาด');
     }
   }
 
   onEmpUpload(files: File[]): any {
-    return this.leaveService.uploadFile(this.leave!.id, files);
+    // Wrap service call so caller (upload-zone) can subscribe; after success we also reload status
+    const obs = this.leaveService.uploadFile(this.leave!.id, files);
+    // Side-effect: after upload completes, refresh leave to handle SU->DC transition
+    // Note: upload-zone will handle subscription; we tap via side subscription here is not needed
+    // but we ensure reload will also be triggered via (uploadComplete) event in template
+    return obs;
   }
 
   onEmpDelete(fileId: string): any {

@@ -16,7 +16,7 @@ export class UploadZoneComponent implements OnInit, OnDestroy, OnChanges {
   @Input() leaveId!: string;
   @Input() accept = '.pdf,.jpg,.jpeg,.png,.docx';
   @Input() multiple = true;
-  @Input() maxFiles = 10;
+  @Input() maxFiles = 5;
   @Input() maxSizeMB = 10;
   @Input() uploadFn?: (files: File[]) => Observable<any>;
   @Input() getFilesFn?: () => Observable<UploadedFile[]>;
@@ -246,8 +246,9 @@ export class UploadZoneComponent implements OnInit, OnDestroy, OnChanges {
       this.uploadComplete.emit(files);
       this.loadExistingFiles();
     } catch (err: any) {
-      this.toast.error('อัปโหลดไฟล์ล้มเหลว: ' + (err.message || ''));
+      this.toast.error('อัปโหลดไฟล์ล้มเหลว: ' + (err.error?.message || err.message || ''));
       this.pendingFiles = [...files, ...this.pendingFiles];
+      throw err;
     } finally {
       this.uploading = false;
     }

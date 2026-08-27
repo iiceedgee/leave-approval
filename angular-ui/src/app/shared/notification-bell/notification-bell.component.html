@@ -5,12 +5,13 @@
   <div class="notification-card" *ngIf="showNotifications" (click)="$event.stopPropagation()">
     <div class="notification-header">การแจ้งเตือน</div>
     <div class="notification-list">
-      <div class="notification-item" *ngFor="let n of notifications" (click)="stampRead(n)">
+      <div class="notification-item" *ngFor="let n of notifications" (click)="onClick(n, $event)">
         <span class="badge-floating" *ngIf="!n.isRead"></span>
-        <span class="time">{{ n.time | date:'dd/MM/yyyy HH:mm' }}</span>
-        <div class="title">{{ n.title }}</div>
-        <div class="detail">{{ n.detail }}</div>
-        <a class="action-link" *ngIf="n.actionLink" [routerLink]="n.actionLink">รายละเอียด</a>
+        <div class="detail">
+          <div>ประเภท: {{ n.type }}</div>
+          <div>วันที่: {{ n.date }}</div>
+          <div>สถานะ: <span [class]="n.statusClass">{{ n.statusLabel }}</span></div>
+        </div>
       </div>
       <div class="notification-item" *ngIf="notifications.length === 0">
         <div class="detail">ไม่มีการแจ้งเตือน</div>
