@@ -14,5 +14,5 @@
  */
 export const environment = {
   production: true,
-  apiUrl: 'https://leave-api.vercel.app/api',
+  apiUrl: 'https://leave-approval-api.vercel.app/api',
 };

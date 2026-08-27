@@ -1,6 +1,6 @@
 {
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "https://leave-api.vercel.app/api/$1" },
+    { "source": "/api/(.*)", "destination": "https://leave-approval-api.vercel.app/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
