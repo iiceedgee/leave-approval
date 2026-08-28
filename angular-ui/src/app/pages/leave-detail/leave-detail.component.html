@@ -39,11 +39,10 @@
     <app-stepper [steps]="stepperSteps"></app-stepper>
   </div>
 
-  <!-- Plan A: HR/MGR เห็นข้อความรออัปโหลดที่ SU แทนหน้าว่าง -->
+  <!-- Plan A: HR/MGR เห็นข้อความรอแก้ไขที่ SU แทนหน้าว่าง -->
   <div class="action-panel" *ngIf="shouldShowWaitingForHr">
-    <h4>รอเอกสารจากพนักงาน</h4>
-    <p>คำขอนี้อยู่สถานะ <b>ยื่นคำขอ (SU)</b> — รอพนักงานอัปโหลดเอกสารก่อน จึงจะตรวจสอบได้</p>
-    <p style="color:#666;font-size:13px">FLOW: SU → DC (อัปโหลด) → MA (หัวหน้าอนุมัติ) → AP</p>
+    <h4>รอการแก้ไขการยื่นคำขอจากพนักงาน</h4>
+    <p>คำขอถูกส่งกลับแก้ไข — รอพนักงานแก้ไขและแนบเอกสารใหม่</p>
   </div>
 
   <div class="action-panel" *ngIf="canDoPretemp">
