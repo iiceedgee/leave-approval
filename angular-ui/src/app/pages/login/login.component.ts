@@ -22,8 +22,8 @@ export class LoginComponent {
     }
     this.error = '';
     this.auth.login(this.username, this.password).subscribe({
-      next: (res) => {
-        const target = res.user.role === 'emp' ? '/leave/new' : '/dashboard';
+      next: () => {
+        const target = '/dashboard';
         this.router.navigate([target]).then(ok => {
           if (!ok) {
             console.warn('[login] navigate blocked', target, 'isLoggedIn', this.auth.isLoggedIn());
