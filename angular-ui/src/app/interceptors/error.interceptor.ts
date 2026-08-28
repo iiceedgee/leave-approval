@@ -8,6 +8,8 @@ import { AuthService } from '../services/auth.service';
 
 @Injectable()
 export class ErrorInterceptor implements HttpInterceptor {
+  private handling401 = false;
+
   constructor(
     private router: Router,
     private toast: ToastService,
@@ -20,30 +22,44 @@ export class ErrorInterceptor implements HttpInterceptor {
         const userFriendlyMessage = this.getUserFriendlyMessage(error);
         this.logError(error, userFriendlyMessage);
 
+        // ไม่ toast สำหรับ request ที่ component จัดการเองอยู่แล้ว (เช่น getStepper/history fallback)
+        const silentUrls = ['/stepper', '/history', '/my-balance', '/my-history'];
+        const isSilent = silentUrls.some(u => error.url?.includes(u));
+
         switch (error.status) {
           case 401:
+            if (this.handling401) break;
+            this.handling401 = true;
             this.auth.logout();
-            this.toast.info('เซสชันของคุณหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง');
-            this.router.navigate(['/login']);
+            if (!isSilent) this.toast.info('เซสชันของคุณหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง');
+            this.router.navigate(['/login']).finally(() => {
+              setTimeout(() => (this.handling401 = false), 1000);
+            });
             break;
 
           case 403:
-            this.toast.warning('คุณไม่มีสิทธิ์ดำเนินการนี้');
+            if (!isSilent) this.toast.warning('คุณไม่มีสิทธิ์ดำเนินการนี้');
             break;
 
           case 404:
-            this.toast.warning('ไม่พบทรัพยากรที่ร้องขอ');
+            // 404 จาก stepper/history ไม่ต้อง toast — ให้ component แสดง fallback เอง
+            if (!isSilent) this.toast.warning(userFriendlyMessage || 'ไม่พบทรัพยากรที่ร้องขอ');
             break;
 
           case 500:
-            this.toast.error('เกิดข้อผิดพลาดที่เซิร์ฟเวอร์ กรุณาลองอีกครั้ง');
+            if (!isSilent) this.toast.error('เกิดข้อผิดพลาดที่เซิร์ฟเวอร์ กรุณาลองอีกครั้ง');
             break;
 
           default:
-            if (error.status >= 400 && error.status < 500) {
-              this.toast.warning(userFriendlyMessage);
-            } else {
-              this.toast.error(userFriendlyMessage);
+            if (!isSilent) {
+              if (error.status >= 400 && error.status < 500) {
+                this.toast.warning(userFriendlyMessage);
+              } else if (error.status !== 0) {
+                this.toast.error(userFriendlyMessage);
+              } else {
+                // status 0 = network/CORS — ไม่สแปม
+                this.toast.error('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาตรวจสอบการเชื่อมต่อ');
+              }
             }
             break;
         }

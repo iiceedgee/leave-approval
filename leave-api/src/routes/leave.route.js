@@ -1,6 +1,12 @@
 const { Router } = require('express');
 const authMiddleware = require('../middleware/auth.middleware');
 const roleMiddleware = require('../middleware/role.middleware');
+const { isValidId } = require('../middleware/upload.middleware');
+
+function validateId(req, res, next) {
+  if (!isValidId(req.params.id)) return res.status(400).json({ message: 'รหัสคำขอไม่ถูกต้อง' });
+  next();
+}
 
 module.exports = function (leaveService) {
   const router = Router();
@@ -36,10 +42,8 @@ module.exports = function (leaveService) {
   });
 
   // GET /api/leave/:id — ดูรายละเอียดคำขอ (ต้องอยู่ท้ายสุดของ GET routes)
-  router.get('/:id', async (req, res, next) => {
+  router.get('/:id', validateId, async (req, res, next) => {
     try {
-      // ⚠️ เดิม: const id = parseInt(req.params.id) — ตอนนั้น id เป็นตัวเลข 1,2,3
-      // พอเชื่อม Supabase → id เปลี่ยนเป็น UUID (เช่น 550e8400-...) ต้องใช้ string ตรงๆ
       const id = req.params.id;
       const leave = await leaveService.getById(id);
       if (!leave) return res.status(404).json({ message: 'ไม่พบคำขอ' });
@@ -48,7 +52,7 @@ module.exports = function (leaveService) {
   });
 
   // POST /api/leave/:id/resubmit — พนักงานส่งใหม่หลังจากถูกส่งกลับ
-  router.post('/:id/resubmit', roleMiddleware('emp'), async (req, res, next) => {
+  router.post('/:id/resubmit', validateId, roleMiddleware('emp'), async (req, res, next) => {
     try {
       const id = req.params.id;
       const leave = await leaveService.resubmit(id, req.user.id, req.body);
@@ -58,7 +62,7 @@ module.exports = function (leaveService) {
   });
 
   // POST /api/leave/:id/cancel — พนักงานยกเลิกคำขอตัวเอง
-  router.post('/:id/cancel', roleMiddleware('emp'), async (req, res, next) => {
+  router.post('/:id/cancel', validateId, roleMiddleware('emp'), async (req, res, next) => {
     try {
       const id = req.params.id;
       const result = await leaveService.cancel(id, req.user.id, 'emp', req.body.remark);
@@ -69,7 +73,7 @@ module.exports = function (leaveService) {
   });
 
   // GET /api/leave/:id/stepper — ★ ดึง stepper steps
-  router.get('/:id/stepper', async (req, res, next) => {
+  router.get('/:id/stepper', validateId, async (req, res, next) => {
     try {
       const id = req.params.id;
       const steps = await leaveService.getStepper(id);
@@ -78,7 +82,7 @@ module.exports = function (leaveService) {
   });
 
   // GET /api/leave/:id/history — ★ ดึงประวัติการเปลี่ยนแปลง
-  router.get('/:id/history', async (req, res, next) => {
+  router.get('/:id/history', validateId, async (req, res, next) => {
     try {
       const id = req.params.id;
       const history = await leaveService.getHistory(id);

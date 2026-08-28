@@ -3,7 +3,7 @@
 const { Router } = require('express');
 const authMiddleware = require('../middleware/auth.middleware');
 const roleMiddleware = require('../middleware/role.middleware');
-const { upload, handleMulterError } = require('../middleware/upload.middleware');
+const { upload, handleMulterError, isValidId } = require('../middleware/upload.middleware');
 const { STATUS } = require('../constants/status');
 
 async function canAccessLeave(db, leaveId, user) {
@@ -32,13 +32,11 @@ module.exports = function (fileService) {
   const db = fileService.db;
 
   router.post('/:id/files', (req, res, next) => {
+    if (!isValidId(req.params.id)) return res.status(400).json({ message: 'รหัสคำขอไม่ถูกต้อง' });
     upload.array('files', 5)(req, res, async (err) => {
       if (err) return handleMulterError(err, req, res, next);
       try {
         const leaveId = req.params.id;
-        if (!leaveId || typeof leaveId !== 'string') {
-          return res.status(400).json({ message: 'รหัสคำขอไม่ถูกต้อง' });
-        }
         const leave = await db.getLeaveById(leaveId);
         if (!leave) return res.status(404).json({ message: 'ไม่พบคำขอ' });
 
@@ -87,8 +85,13 @@ module.exports = function (fileService) {
   // บน Vercel ใช้ Supabase Signed URL, local ใช้ res.download
   router.get('/:id/files/:fileId', async (req, res, next) => {
     try {
+      if (!isValidId(req.params.id)) return res.status(400).json({ message: 'รหัสคำขอไม่ถูกต้อง' });
       const leaveId = req.params.id;
       const fileId = req.params.fileId;
+      if (!fileId || typeof fileId !== 'string' || !isValidId(fileId) && !/^[0-9a-f-]{36}$/i.test(fileId) && !/^\d+$/.test(fileId)) {
+        // fileId เป็น UUID เสมอ แต่กันไว้
+        if (!fileId) return res.status(400).json({ message: 'รหัสไม่ถูกต้อง' });
+      }
       if (!leaveId || !fileId) return res.status(400).json({ message: 'รหัสไม่ถูกต้อง' });
 
       if (!(await canAccessLeave(db, leaveId, req.user))) {

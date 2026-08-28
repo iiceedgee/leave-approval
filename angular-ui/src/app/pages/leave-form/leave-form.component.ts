@@ -72,12 +72,23 @@ export class LeaveFormComponent implements OnInit, OnDestroy {
       this.showUploadSection = true;
       this.leaveService.getLeave(this.resubmitId).pipe(
         takeUntil(this.destroy$)
-      ).subscribe(l => {
-        this.resubmitNo = (l as any).request_no || null;
-        this.leaveType = l.leave_type;
-        this.startDate = l.start_date;
-        this.endDate = l.end_date;
-        this.reason = l.reason;
+      ).subscribe({
+        next: l => {
+          if (!l || !l.id) {
+            this.msg = 'ไม่พบคำขอลา';
+            this.isError = true;
+            return;
+          }
+          this.resubmitNo = (l as any).request_no || null;
+          this.leaveType = l.leave_type;
+          this.startDate = l.start_date;
+          this.endDate = l.end_date;
+          this.reason = l.reason;
+        },
+        error: (err) => {
+          this.msg = err?.error?.message || 'โหลดข้อมูลล้มเหลว';
+          this.isError = true;
+        }
       });
     }
   }
@@ -108,8 +119,20 @@ export class LeaveFormComponent implements OnInit, OnDestroy {
       return;
     }
 
-    if (this.endDate < this.startDate) {
+    const s = new Date(this.startDate);
+    const e = new Date(this.endDate);
+    if (isNaN(s.getTime()) || isNaN(e.getTime())) {
+      this.msg = 'รูปแบบวันที่ไม่ถูกต้อง';
+      this.isError = true;
+      return;
+    }
+    if (e < s) {
       this.msg = 'วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่มต้น';
+      this.isError = true;
+      return;
+    }
+    if (!this.reason || this.reason.trim().length < 5) {
+      this.msg = 'เหตุผลต้องมีอย่างน้อย 5 ตัวอักษร';
       this.isError = true;
       return;
     }

@@ -1,8 +1,9 @@
 <div class="step-tracker">
   <div class="step"
     *ngFor="let step of steps"
-    [class.active]="isActive(step)"
     [class.done]="step.state === 'done'"
+    [class.current]="step.state === 'current'"
+    [class.pending]="step.state === 'pending'"
     [class.cancelled]="step.state === 'cancelled'"
     [class.rejected]="step.state === 'rejected'">
     <div class="step-box">

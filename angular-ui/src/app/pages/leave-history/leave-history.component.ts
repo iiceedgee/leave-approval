@@ -14,7 +14,7 @@ import { formatThaiDateRange, toBuddhistYear, recentYears } from '../../utils/da
   styleUrls: ['./leave-history.component.scss'],
 })
 export class LeaveHistoryComponent implements OnInit {
-  user = this.auth.getUser();
+  user: any = null;
   currentYear = new Date().getFullYear();
   selectedYear = this.currentYear;
   years = recentYears(5);
@@ -36,21 +36,25 @@ export class LeaveHistoryComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    try { this.user = this.auth.getUser(); } catch { this.user = null; }
     this.loadData();
   }
 
   loadData(): void {
     this.loading = true;
+    this.errorMessage = '';
     forkJoin([
       this.leaveService.getMyBalance(this.selectedYear),
       this.leaveService.getMyHistory(this.selectedYear),
     ]).subscribe({
       next: ([balances, history]) => {
-        this.balances = balances;
-        this.history = history;
+        this.balances = Array.isArray(balances) ? balances : [];
+        this.history = Array.isArray(history) ? history : [];
         this.loading = false;
       },
       error: () => {
+        this.balances = [];
+        this.history = [];
         this.loading = false;
         this.errorMessage = 'ไม่สามารถโหลดข้อมูลได้ กรุณาลองอีกครั้ง';
       },

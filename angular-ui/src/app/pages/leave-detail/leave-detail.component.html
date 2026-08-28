@@ -1,6 +1,6 @@
 <div class="page-container" *ngIf="!loading && leave">
   <div class="header">
-    <h2>คำขอลา #{{ leave.request_no || leave.id.slice(0,8) }}</h2>
+    <h2>คำขอลา #{{ leave.request_no || (leave.id ? leave.id.toString().slice(0,8) : '-') }}</h2>
     <div class="header-right">
       <app-notification-bell></app-notification-bell>
       <span class="badge">{{ user?.fullName }} ({{ user?.role }})</span>
@@ -54,8 +54,28 @@
       placeholder="หมายเหตุ"
     ></textarea>
     <div class="action-btns">
-      <button class="btn btn-approve" (click)="handlePretempPass()">✓ เอกสารครบถ้วน</button>
-      <button class="btn btn-sendback" (click)="handlePretempSendBack()">↺ ส่งกลับแก้ไข</button>
+      <button
+        class="btn btn-approve"
+        (click)="handlePretempPass()"
+        [disabled]="loading"
+        [attr.aria-disabled]="loading"
+        [attr.title]="loading ? 'กำลังโหลด...' : 'ยืนยันว่าเอกสารครบถ้วนและส่งต่อให้หัวหน้าอนุมัติ'"
+      >✓ เอกสารครบถ้วน</button>
+      <button
+        class="btn btn-sendback"
+        (click)="handlePretempSendBack()"
+        [disabled]="isPretempSendDisabled"
+        [attr.aria-disabled]="isPretempSendDisabled"
+        [attr.title]="isPretempSendDisabled ? 'กรุณาระบุเหตุผลที่ส่งกลับ' : 'ส่งกลับแก้ไขเอกสาร'"
+      >↺ ส่งกลับแก้ไข</button>
+      <button
+        class="btn btn-reject"
+        *ngIf="canReject"
+        (click)="handlePretempReject()"
+        [disabled]="isPretempRejectDisabled"
+        [attr.aria-disabled]="isPretempRejectDisabled"
+        [attr.title]="isPretempRejectDisabled ? 'กรุณาระบุเหตุผล' : 'ไม่อนุมัติคำขอนี้'"
+      >✕ ไม่อนุมัติ</button>
     </div>
   </div>
 
@@ -68,9 +88,30 @@
       placeholder="หมายเหตุ (ถ้ามี)"
     ></textarea>
     <div class="action-btns">
-      <button class="btn btn-approve" *ngIf="canApprove" (click)="handleApprove()">✓ อนุมัติ</button>
-      <button class="btn btn-sendback" *ngIf="canSendBack" (click)="handleSendBack()">↺ ส่งกลับแก้ไข</button>
-      <button class="btn btn-reject" *ngIf="canReject" (click)="handleReject()">✕ ไม่อนุมัติ</button>
+      <button
+        class="btn btn-approve"
+        *ngIf="canApprove"
+        (click)="handleApprove()"
+        [disabled]="loading"
+        [attr.aria-disabled]="loading"
+        [attr.title]="loading ? 'กำลังโหลด...' : 'อนุมัติคำขอนี้'"
+      >✓ อนุมัติ</button>
+      <button
+        class="btn btn-sendback"
+        *ngIf="canSendBack"
+        (click)="handleSendBack()"
+        [disabled]="isApprovalSendDisabled"
+        [attr.aria-disabled]="isApprovalSendDisabled"
+        [attr.title]="isApprovalSendDisabled ? 'กรุณาระบุเหตุผลที่ส่งกลับ' : 'ส่งกลับแก้ไขคำขอนี้'"
+      >↺ ส่งกลับแก้ไข</button>
+      <button
+        class="btn btn-reject"
+        *ngIf="canReject"
+        (click)="handleReject()"
+        [disabled]="isRejectDisabled"
+        [attr.aria-disabled]="isRejectDisabled"
+        [attr.title]="isRejectDisabled ? 'กรุณาระบุเหตุผล' : 'ไม่อนุมัติคำขอนี้'"
+      >✕ ไม่อนุมัติ</button>
     </div>
   </div>
 

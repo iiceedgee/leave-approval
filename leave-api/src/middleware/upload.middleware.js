@@ -9,19 +9,33 @@ const UPLOAD_PATH = process.env.UPLOAD_PATH || 'uploads';
 // Local (dev/test) ยังใช้ diskStorage เหมือนเดิมเพื่อให้ flow เดิมไม่เปลี่ยน
 const isVercel = !!process.env.VERCEL;
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isValidId(id) {
+  if (!id || typeof id !== 'string') return false;
+  // รับทั้ง UUID (supabase) และตัวเลข (legacy/in-memory) แต่ต้องไม่มี / \ . หรือ ..
+  if (UUID_RE.test(id)) return true;
+  if (/^\d+$/.test(id)) return true;
+  return false;
+}
+
 const storage = isVercel
   ? multer.memoryStorage()
   : multer.diskStorage({
       destination: (req, file, cb) => {
         const id = req.params.id;
-        if (!id) return cb(new Error('Invalid leave ID'));
+        if (!isValidId(id)) return cb(new Error('รหัสคำขอไม่ถูกต้อง'));
         const dir = path.resolve(UPLOAD_PATH, String(id));
         if (!dir.startsWith(path.resolve(UPLOAD_PATH))) return cb(new Error('Invalid path'));
-        require('fs').mkdirSync(dir, { recursive: true });
+        try {
+          require('fs').mkdirSync(dir, { recursive: true });
+        } catch (e) {
+          return cb(new Error('สร้างโฟลเดอร์ไม่ได้'));
+        }
         cb(null, dir);
       },
       filename: (req, file, cb) => {
-        const ext = path.extname(file.originalname);
+        const ext = path.extname(file.originalname).toLowerCase();
         cb(null, `${uuidv4()}${ext}`);
       },
     });
@@ -58,4 +72,4 @@ function handleMulterError(err, req, res, next) {
   next();
 }
 
-module.exports = { upload, handleMulterError, UPLOAD_PATH };
+module.exports = { upload, handleMulterError, UPLOAD_PATH, isValidId };

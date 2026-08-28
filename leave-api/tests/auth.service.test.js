@@ -65,6 +65,7 @@ describe('AuthService — register (security fix)', () => {
       password: '123456',
       fullName: 'คนเดิม',
       role: 'emp',
+      department: 'ฝ่ายผลิต',
     });
 
     await expect(
@@ -73,6 +74,7 @@ describe('AuthService — register (security fix)', () => {
         password: '123456',
         fullName: 'คนใหม่',
         role: 'emp',
+        department: 'ฝ่ายผลิต',
       })
     ).rejects.toThrow('username นี้มีอยู่แล้ว');
   });

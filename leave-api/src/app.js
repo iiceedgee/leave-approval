@@ -40,13 +40,15 @@ const auditLogMiddleware = require('./middleware/audit-log.middleware');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// CORS: ถ้ามี FRONTEND_URL ให้ล็อค origin ตาม env (production), ถ้าไม่มีให้เปิดทั้งหมด (dev)
+// CORS: ถ้ามี FRONTEND_URL ให้ล็อคตาม env (รองรับหลาย origin คั่นด้วย ,), ถ้าไม่มีให้เปิดทั้งหมด dev
 const corsOptions = {
-  origin: process.env.FRONTEND_URL || true,
+  origin: process.env.FRONTEND_URL
+    ? process.env.FRONTEND_URL.split(',').map(s => s.trim()).filter(Boolean)
+    : true,
   credentials: true,
 };
 app.use(cors(corsOptions));
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 
 // ★ เลือก data layer: มี Supabase จริง → ใช้ SupabaseStore, ไม่งั้นใช้ InMemory
 // เดิมบรรทัดนี้มีแค่: const db = new InMemoryStore();
@@ -112,7 +114,11 @@ if (!process.env.VERCEL) {
 // Start — แยกสำหรับ local vs Vercel serverless
 // Vercel จะ import app ผ่าน api/index.js โดยไม่ต้อง listen, local ใช้ node src/app.js ถึงจะ listen
 async function start() {
-  await db.seed();
+  try {
+    await db.seed();
+  } catch (e) {
+    console.error('[DB] seed failed:', e.message);
+  }
   app.listen(PORT, () => {
     console.log(`\n🚀 Leave API running at http://localhost:${PORT}`);
     console.log(`💾 Data layer: ${supabaseClient ? 'Supabase (Postgres)' : 'In-Memory (fallback)'}`);

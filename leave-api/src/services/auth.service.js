@@ -11,15 +11,16 @@ class AuthService {
   }
 
   async register({ username, password, fullName, role, department }) {
-    // ★ C: ปิด loophole — ป้องกันสมัครเป็น mgr/hr เองได้
-    //    มีแค่ emp เท่านั้นที่ลงทะเบียนได้เอง ส่วน mgr/hr ต้องสร้างโดย admin/seed
     if (role && role !== 'emp') {
       throw new Error('ไม่สามารถสมัครเป็น ' + role + ' ได้ กรุณาติดต่อ HR');
     }
-
+    if (!username || typeof username !== 'string' || username.trim().length < 3) throw new Error('username ต้องมีอย่างน้อย 3 ตัวอักษร');
+    if (!password || typeof password !== 'string' || password.length < 6) throw new Error('password ต้องมีอย่างน้อย 6 ตัวอักษร');
+    if (!department || typeof department !== 'string' || !department.trim()) throw new Error('กรุณาระบุแผนก');
+    username = username.trim();
+    if (!/^[a-zA-Z0-9_.-]+$/.test(username)) throw new Error('username ใช้ได้เฉพาะ a-z, 0-9, _ . -');
     const existing = await this.db.findUserByUsername(username);
     if (existing) throw new Error('username นี้มีอยู่แล้ว');
-
     const passwordHash = await bcrypt.hash(password, 10);
     const user = await this.db.createUser({
       username,
@@ -34,7 +35,9 @@ class AuthService {
   }
 
   async login(username, password) {
-    const user = await this.db.findUserByUsername(username);
+    if (!username || !password) throw new Error('กรุณากรอก username และ password');
+    if (typeof username !== 'string' || typeof password !== 'string') throw new Error('ข้อมูลไม่ถูกต้อง');
+    const user = await this.db.findUserByUsername(username.trim());
     if (!user) throw new Error('username หรือ password ไม่ถูกต้อง');
     if (user.status !== 'Y') throw new Error('บัญชีนี้ถูกระงับ');
 

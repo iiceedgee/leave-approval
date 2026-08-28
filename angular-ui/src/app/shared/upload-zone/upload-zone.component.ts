@@ -121,30 +121,54 @@ export class UploadZoneComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   loadExistingFiles(): void {
+    if (!this.leaveId) {
+      this.existingFileList = [];
+      this.loading = false;
+      return;
+    }
     this.loading = true;
     const fn = this.getFilesFn || (() => this.leaveId ? this.leaveService.getFiles(this.leaveId) : of([]));
     fn().pipe(takeUntil(this.destroy$)).subscribe({
       next: (files) => {
-        this.existingFileList = files;
+        this.existingFileList = Array.isArray(files) ? files : [];
         this.loading = false;
       },
       error: () => {
+        this.existingFileList = [];
         this.loading = false;
       },
     });
   }
 
   downloadFile(fileId: string, fileName: string): void {
+    if (!this.leaveId || !fileId) {
+      this.toast.error('รหัสไฟล์ไม่ถูกต้อง');
+      return;
+    }
     this.leaveService.downloadFile(this.leaveId, fileId).pipe(takeUntil(this.destroy$)).subscribe({
       next: (blob) => {
+        // ถ้า API ส่ง JSON error กลับมาเป็น blob (เช่น 404) → ต้องเช็คก่อน
+        if (blob.type && blob.type.includes('application/json')) {
+          (blob as any).text().then((t: string) => {
+            try {
+              const j = JSON.parse(t);
+              this.toast.error(j.message || 'ดาวน์โหลดไฟล์ล้มเหลว');
+            } catch {
+              this.toast.error('ดาวน์โหลดไฟล์ล้มเหลว');
+            }
+          });
+          return;
+        }
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
         a.download = fileName;
+        document.body.appendChild(a);
         a.click();
-        window.URL.revokeObjectURL(url);
+        a.remove();
+        setTimeout(() => window.URL.revokeObjectURL(url), 1000);
       },
-      error: () => this.toast.error('ดาวน์โหลดไฟล์ล้มเหลว'),
+      error: (err) => this.toast.error(err?.error?.message || 'ดาวน์โหลดไฟล์ล้มเหลว'),
     });
   }
 
@@ -162,6 +186,10 @@ export class UploadZoneComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   openPreview(file: UploadedFile): void {
+    if (!this.leaveId || !file?.id) {
+      this.toast.error('รหัสไฟล์ไม่ถูกต้อง');
+      return;
+    }
     const kind = this.getPreviewKind(file);
     if (kind === 'other') {
       this.previewFile = { file, url: '', safeUrl: null, kind };
@@ -170,7 +198,10 @@ export class UploadZoneComponent implements OnInit, OnDestroy, OnChanges {
     const reqId = ++this.previewRequestId;
     this.leaveService.downloadFile(this.leaveId, file.id).pipe(takeUntil(this.destroy$)).subscribe({
       next: (blob) => {
-        if (reqId !== this.previewRequestId) {
+        if (reqId !== this.previewRequestId) return;
+        if (blob.type && blob.type.includes('application/json')) {
+          this.previewFile = { file, url: '', safeUrl: null, kind: 'other' };
+          this.toast.error('เปิดดูไฟล์ล้มเหลว');
           return;
         }
         const url = URL.createObjectURL(blob);
@@ -181,7 +212,7 @@ export class UploadZoneComponent implements OnInit, OnDestroy, OnChanges {
           kind,
         };
       },
-      error: () => this.toast.error('เปิดดูไฟล์ล้มเหลว'),
+      error: (err) => this.toast.error(err?.error?.message || 'เปิดดูไฟล์ล้มเหลว'),
     });
   }
 
@@ -214,10 +245,10 @@ export class UploadZoneComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   formatFileSize(bytes: number): string {
-    if (bytes >= 1048576) {
-      return (bytes / 1048576).toFixed(1) + ' MB';
-    }
-    return (bytes / 1024).toFixed(1) + ' KB';
+    const n = Number(bytes) || 0;
+    if (n >= 1048576) return (n / 1048576).toFixed(1) + ' MB';
+    if (n >= 1024) return (n / 1024).toFixed(1) + ' KB';
+    return n + ' B';
   }
 
   deleteFile(fileId: string): void {
@@ -232,16 +263,30 @@ export class UploadZoneComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   async uploadAll(): Promise<void> {
+    if (this.uploading) return;
     if (this.pendingFiles.length === 0) {
       this.toast.warning('กรุณาเลือกไฟล์ก่อนอัปโหลด');
+      return;
+    }
+    if (!this.leaveId) {
+      this.toast.error('รหัสคำขอไม่ถูกต้อง');
       return;
     }
     this.uploading = true;
     const files = [...this.pendingFiles];
     this.pendingFiles = [];
-    const fn = this.uploadFn || ((f: File[]) => this.leaveService.uploadFile(this.leaveId, f));
+    let obs: Observable<any>;
     try {
-      await firstValueFrom(fn(files).pipe(takeUntil(this.destroy$)));
+      const fn = this.uploadFn || ((f: File[]) => this.leaveService.uploadFile(this.leaveId, f));
+      obs = fn(files);
+    } catch (err: any) {
+      this.toast.error(err?.message || 'อัปโหลดไฟล์ล้มเหลว');
+      this.pendingFiles = [...files, ...this.pendingFiles];
+      this.uploading = false;
+      throw err;
+    }
+    try {
+      await firstValueFrom(obs.pipe(takeUntil(this.destroy$)));
       this.toast.success('อัปโหลดไฟล์เรียบร้อย');
       this.uploadComplete.emit(files);
       this.loadExistingFiles();

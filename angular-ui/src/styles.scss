@@ -18,6 +18,10 @@ a { text-decoration: none; color: $primary; }
 .btn { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-family: inherit; }
 .btn-primary { background: $primary; color: white; }
 .btn-primary:disabled { opacity: .6; cursor: not-allowed; }
+.btn-approve:disabled,
+.btn-sendback:disabled,
+.btn-reject:disabled,
+.btn-cancel:disabled { opacity: .45; cursor: not-allowed; filter: grayscale(.15); }
 .btn-outline { background: white; color: $primary; border: 2px solid $primary; }
 .btn-approve { background: $success; color: white; }
 .btn-sendback { background: $sendback; color: white; }

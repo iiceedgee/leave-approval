@@ -25,10 +25,14 @@ export class DashboardComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.user = this.auth.getUser();
+    try {
+      this.user = this.auth.getUser();
+    } catch {
+      this.user = null;
+    }
     this.leaveService.getLeaves().subscribe({
-      next: (data) => { this.leaves = data; this.loading = false; },
-      error: () => { this.loading = false; }
+      next: (data) => { this.leaves = Array.isArray(data) ? data : []; this.loading = false; },
+      error: () => { this.leaves = []; this.loading = false; }
     });
   }
 

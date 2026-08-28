@@ -65,20 +65,22 @@ export class LeaveDetailComponent implements OnInit, OnDestroy {
   loadData(id: string): void {
     if (!id || typeof id !== 'string') {
       this.loading = false;
+      this.toast.error('รหัสคำขอไม่ถูกต้อง');
       return;
     }
     this.loading = true;
     this.leaveService.getLeave(id).pipe(takeUntil(this.destroy$)).subscribe({
       next: (leave) => {
-        if (!leave) {
+        if (!leave || !leave.id) {
           this.loading = false;
           this.toast.error('ไม่พบข้อมูลคำขอ');
           return;
         }
         this.leave = leave;
+        // stepper/history ต้องไม่ทำให้หน้าค้างถ้าพัง — catch แยก
         forkJoin([
-          this.leaveService.getStepper(id),
-          this.leaveService.getHistory(id),
+          this.leaveService.getStepper(id).pipe(takeUntil(this.destroy$)),
+          this.leaveService.getHistory(id).pipe(takeUntil(this.destroy$)),
         ]).pipe(takeUntil(this.destroy$)).subscribe({
           next: ([steps, items]) => {
             this.stepperSteps = Array.isArray(steps) ? steps : [];
@@ -87,6 +89,8 @@ export class LeaveDetailComponent implements OnInit, OnDestroy {
           },
           error: (err) => {
             console.error('[leave-detail] load stepper/history failed', err);
+            this.stepperSteps = [];
+            this.timelineItems = [];
             this.loading = false;
           },
         });
@@ -192,7 +196,29 @@ export class LeaveDetailComponent implements OnInit, OnDestroy {
   }
 
   get showApprovalPanel(): boolean {
-    return this.canApprove || this.canSendBack || this.canReject;
+    // Plan A — strict separation: approval panel only at MA (never at DC)
+    // Ensures DC shows only "ตรวจสอบเอกสาร" panel, MA shows only "อนุมัติคำขอ"
+    return this.leave?.current_status === STATUS.MA.code && (this.canApprove || this.canSendBack || this.canReject);
+  }
+
+  /** Disabled state for DC send-back / reject buttons — requires remark + not loading */
+  get isPretempSendDisabled(): boolean {
+    return !this.pretempRemark?.trim() || this.loading;
+  }
+
+  /** Alias for pretemp reject — same rule: remark required */
+  get isPretempRejectDisabled(): boolean {
+    return !this.pretempRemark?.trim() || this.loading;
+  }
+
+  /** Disabled state for MA send-back / reject buttons — requires approvalRemark + not loading */
+  get isApprovalSendDisabled(): boolean {
+    return !this.approvalRemark?.trim() || this.loading;
+  }
+
+  /** Alias for MA reject — same rule as sendBack at MA */
+  get isRejectDisabled(): boolean {
+    return !this.approvalRemark?.trim() || this.loading;
   }
 
   private async guardHrBlockedAtM(): Promise<boolean> {
@@ -251,6 +277,32 @@ export class LeaveDetailComponent implements OnInit, OnDestroy {
     try {
       await this.leaveService.pretempSendBack(id, this.pretempRemark).toPromise();
       this.toast.success('ส่งกลับแก้ไขเรียบร้อย');
+      setTimeout(() => this.loadData(id), 800);
+    } catch (err: any) {
+      this.toast.error(err?.error?.message || err?.message || 'เกิดข้อผิดพลาด');
+    }
+  }
+
+  async handlePretempReject(): Promise<void> {
+    const id = this.leave?.id;
+    if (!id || typeof id !== 'string') {
+      this.toast.error('รหัสคำขอไม่ถูกต้อง');
+      return;
+    }
+    if (!this.pretempRemark || !this.pretempRemark.trim()) {
+      this.toast.warning('กรุณาระบุเหตุผล');
+      return;
+    }
+    // No HR block at DC — but keep guard for consistency if status races to MA
+    if (await this.guardHrBlockedAtM()) return;
+    const confirmed = await showConfirmDialog({
+      title: 'ยืนยันการไม่อนุมัติ',
+      message: 'ยืนยันการไม่อนุมัติคำขอนี้?',
+    });
+    if (!confirmed) return;
+    try {
+      await this.leaveService.reject(id, this.pretempRemark).toPromise();
+      this.toast.success('ไม่อนุมัติสำเร็จ');
       setTimeout(() => this.loadData(id), 800);
     } catch (err: any) {
       this.toast.error(err?.error?.message || err?.message || 'เกิดข้อผิดพลาด');
@@ -353,24 +405,31 @@ export class LeaveDetailComponent implements OnInit, OnDestroy {
   }
 
   onEmpUpload(files: File[]): any {
-    // Wrap service call so caller (upload-zone) can subscribe; after success we also reload status
-    const obs = this.leaveService.uploadFile(this.leave!.id, files);
-    // Side-effect: after upload completes, refresh leave to handle SU->DC transition
-    // Note: upload-zone will handle subscription; we tap via side subscription here is not needed
-    // but we ensure reload will also be triggered via (uploadComplete) event in template
-    return obs;
+    if (!this.leave?.id) {
+      this.toast.error('รหัสคำขอไม่ถูกต้อง');
+      throw new Error('leave id missing');
+    }
+    return this.leaveService.uploadFile(this.leave.id, files);
   }
 
   onEmpDelete(fileId: string): any {
-    return this.leaveService.deleteFile(this.leave!.id, fileId);
+    if (!this.leave?.id) {
+      this.toast.error('รหัสคำขอไม่ถูกต้อง');
+      throw new Error('leave id missing');
+    }
+    return this.leaveService.deleteFile(this.leave.id, fileId);
   }
 
   canEmpDelete(file: UploadedFile): boolean {
-    return file.uploaded_by === this.user?.id;
+    return !!file && file.uploaded_by === this.user?.id;
   }
 
   onVerificationUpload(files: File[]): any {
-    return this.leaveService.uploadVerificationFile(this.leave!.id, files);
+    if (!this.leave?.id) {
+      this.toast.error('รหัสคำขอไม่ถูกต้อง');
+      throw new Error('leave id missing');
+    }
+    return this.leaveService.uploadVerificationFile(this.leave.id, files);
   }
 
   ngOnDestroy(): void {

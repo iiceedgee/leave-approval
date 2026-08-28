@@ -35,8 +35,16 @@ export class AuthService {
   }
 
   getUser(): User | null {
-    const raw = localStorage.getItem(this.USER_KEY);
-    return raw ? JSON.parse(raw) : null;
+    try {
+      const raw = localStorage.getItem(this.USER_KEY);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch {
+      // storage เสีย — ล้างทิ้งกันพังทั้งแอป
+      localStorage.removeItem(this.USER_KEY);
+      localStorage.removeItem(this.TOKEN_KEY);
+      return null;
+    }
   }
 
   isLoggedIn(): boolean {
