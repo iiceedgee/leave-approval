@@ -42,13 +42,16 @@ export class LeaveDetailComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.user = this.auth.getUser();
-    const id = this.route.snapshot.paramMap.get('id')!;
-    if (!id) {
-      this.toast.error('ไม่พบรหัสคำขอ');
-      this.loading = false;
-      return;
-    }
-    this.loadData(id);
+    // Subscribe to paramMap so clicking notification from same detail page reloads correctly
+    this.route.paramMap.pipe(takeUntil(this.destroy$)).subscribe(params => {
+      const id = params.get('id');
+      if (!id) {
+        this.toast.error('ไม่พบรหัสคำขอ');
+        this.loading = false;
+        return;
+      }
+      this.loadData(id);
+    });
   }
 
   private makeConfetti(): any[] {

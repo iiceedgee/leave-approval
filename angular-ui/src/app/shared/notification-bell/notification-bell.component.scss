@@ -35,7 +35,7 @@ $color-badge: #e53935;
   color: #222;
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-  z-index: 9999;
+  z-index: 1999; // was 9999 — was covering toast (2000) and celebration (1999)
   overflow: hidden;
 }
 
@@ -109,8 +109,8 @@ $color-badge: #e53935;
 @media (max-width: 600px) {
   .notification-card {
     width: calc(100vw - 24px);
-    left: 50%;
-    right: auto;
-    transform: translateX(-50%);
-}
+    left: auto;
+    right: 12px;
+    transform: none;
+  }
 }

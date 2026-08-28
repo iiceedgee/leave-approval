@@ -31,7 +31,10 @@ export class NotificationBellComponent implements OnInit, OnDestroy {
 
   private destroy$ = new Subject<void>();
   private readIds = new Set<string>();
-  private readonly NEED_CHECK = new Set<string>(['DC', 'MA']);
+  private readonly READ_IDS_KEY = 'notif_read_ids';
+  // Phase A: role-based — hook for Phase B notificationService
+  // Phase B will replace getLeaves() with notificationService.getUnread()
+  private readonly NEED_CHECK = new Set<string>(['DC', 'MA']); // fallback for isRead generic
 
   constructor(
     private http: HttpClient,
@@ -41,19 +44,61 @@ export class NotificationBellComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    // poll ทุก 15 วินาที (ไม่ใช่ 30s) ด้วย interval(15000) switchMap
+    this.loadReadIds();
+    // poll ทุก 15 วินาที — Phase A: poll getLeaves, Phase B: switch to notificationService
     interval(15000).pipe(
       startWith(0),
-      switchMap(() => this.leaveService.getLeaves().pipe(
-        catchError(() => of([] as Leave[]))
+      switchMap(() => this.fetchNotifications().pipe(
+        catchError(() => {
+          // keep previous state on error — don't wipe with []
+          return of(null as unknown as Leave[]);
+        })
       )),
       takeUntil(this.destroy$)
     ).subscribe({
-      next: (leaves) => this.handleLeaves(leaves),
+      next: (leaves) => {
+        if (leaves === null) return; // keep previous on error
+        this.handleLeaves(leaves);
+      },
       error: () => {
         // defensive: keep previous state on error
       }
     });
+  }
+
+  /** Hook for Phase B: will be notificationService.getUnread() */
+  private fetchNotifications() {
+    return this.leaveService.getLeaves();
+  }
+
+  private loadReadIds(): void {
+    try {
+      const raw = localStorage.getItem(this.READ_IDS_KEY);
+      if (raw) JSON.parse(raw).forEach((k: string) => this.readIds.add(k));
+    } catch {}
+  }
+
+  private saveReadIds(): void {
+    try { localStorage.setItem(this.READ_IDS_KEY, JSON.stringify([...this.readIds])); } catch {}
+  }
+
+  private getReadKey(id: string, status: string): string {
+    return `${id}:${status}`;
+  }
+
+  private isNeedsCheck(leave: Leave, role: string): boolean {
+    const status = String(leave.current_status);
+    if (role === 'emp') {
+      // emp ต้องทำเมื่อถูกส่งกลับ (SU + flag Y) — SB history but current is SU+Y
+      return status === 'SU' && (leave as any).flag_send_back === 'Y';
+    }
+    if (role === 'mgr') {
+      return status === 'DC' || status === 'MA';
+    }
+    if (role === 'hr') {
+      return status === 'DC';
+    }
+    return this.NEED_CHECK.has(status);
   }
 
   ngOnDestroy(): void {
@@ -69,28 +114,32 @@ export class NotificationBellComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // reuse Dashboard / leave.service filtering: emp เห็นแค่ของตัวเอง (user_id), mgr เห็นเฉพาะ department เดียวกัน, hr เห็นหมด
-    // Note: backend (leave.service.getLeaves) ได้ filter ตาม role แล้ว — client ทำ defensive filtering ซ้ำเพื่อความถูกต้อง
     let filtered = leaves;
     if (user.role === 'emp') {
       filtered = leaves.filter(l => String(l.user_id) === String(user.id));
     } else if (user.role === 'mgr') {
-      // mgr: backend คืนเฉพาะ department เดียวกันแล้ว — ถ้า payload มี department/owner_department จะกรองซ้ำได้
-      // ตอนนี้ Leave ไม่มี department field จึง trust ผลจาก backend (defensive: ไม่กรองซ้ำถ้าไม่มีข้อมูล)
       filtered = leaves;
-    } // hr: เห็นหมด — ไม่ต้องกรอง
+    }
 
-    // map leave -> notification {id, type, date: formatDate 14/08/2026 - 23/08/2026, status, statusLabel, statusClass}
-    this.notifications = filtered.map(l => this.toNotification(l));
+    // Phase A fix: sort by updated_at desc + limit 10 (prevent 1000 rows bloat)
+    const sorted = [...filtered].sort((a, b) => {
+      const ta = new Date((a as any).updated_at || (a as any).created_at).getTime();
+      const tb = new Date((b as any).updated_at || (b as any).created_at).getTime();
+      return tb - ta;
+    }).slice(0, 10);
+
+    this.notifications = sorted.map(l => this.toNotification(l, user.role));
     this.updateUnreadCount();
   }
 
-  private toNotification(leave: Leave): AppNotification {
+  private toNotification(leave: Leave, role?: string): AppNotification {
     const status = String(leave.current_status);
     const id = String(leave.id);
-    // unread คือ status IN ('DC','MA') ที่ต้องตรวจ และยังไม่ถูก stampRead (VC ถูกรวมเข้ากับ DC)
-    const alreadyRead = this.readIds.has(id);
-    const needsCheck = this.NEED_CHECK.has(status);
+    const userRole = role || this.auth.getUser()?.role || '';
+    const needsCheck = this.isNeedsCheck(leave, userRole);
+    const readKey = this.getReadKey(id, status);
+    const alreadyRead = this.readIds.has(readKey);
+    // non-needsCheck → isRead=true but still displayed as read row (empty logic handled separately)
     const isRead = alreadyRead ? true : !needsCheck ? true : false;
 
     return {
@@ -137,8 +186,8 @@ export class NotificationBellComponent implements OnInit, OnDestroy {
   }
 
   private updateUnreadCount(): void {
-    // นับ unread จาก status IN ('DC','MA') ที่ต้องตรวจ และยังไม่ถูก stampRead (VC ถูกรวมแล้ว)
-    this.unreadCount = this.notifications.filter(n => !n.isRead && this.NEED_CHECK.has(n.status)).length;
+    // isRead already encodes per-role NEED_CHECK + id:status, just count unread
+    this.unreadCount = this.notifications.filter(n => !n.isRead).length;
   }
 
   @HostListener('document:click')
@@ -154,7 +203,8 @@ export class NotificationBellComponent implements OnInit, OnDestroy {
   stampRead(n: AppNotification): void {
     if (!n.isRead) {
       n.isRead = true;
-      this.readIds.add(String(n.id));
+      this.readIds.add(this.getReadKey(String(n.id), String(n.status)));
+      this.saveReadIds();
       this.updateUnreadCount();
     }
   }
