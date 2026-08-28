@@ -22,23 +22,17 @@
 .step.done .label { color: #2e7d32; font-weight: 500; }
 .step.done .step-line { background-color: #2e7d32; }
 
-// current = กำลังดำเนินการ = น้ำเงินเข้ม #0E3362 เน้นชัดเจน
+// current = กำลังดำเนินการ = น้ำเงินเข้ม #0E3362 เน้นชัดเจน — NO CIRCLE
 .step.current .icon-container {
   color: #0E3362;
-  border: 2px solid #0E3362;
-  border-radius: 50%;
-  background: white;
-  box-shadow: 0 0 0 4px rgba(14, 51, 98, 0.12);
-  animation: pulse 2s infinite;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  animation: none;
 }
 .step.current .label { color: #0E3362; font-weight: 600; }
 .step.current .step-line { background-color: #C4C4C4; }
-
-@keyframes pulse {
-  0% { box-shadow: 0 0 0 0 rgba(14, 51, 98, 0.18); }
-  70% { box-shadow: 0 0 0 8px rgba(14, 51, 98, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(14, 51, 98, 0); }
-}
 
 // pending = รอดำเนินการ = เทา
 .step.pending .icon-container { color: #C4C4C4; }
@@ -54,7 +48,3 @@
 
 .step.cancelled .label,
 .step.rejected .label { color: #c62828; }
-
-@media (prefers-reduced-motion: reduce) {
-  .step.current .icon-container { animation: none; }
-}
