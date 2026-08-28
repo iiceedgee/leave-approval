@@ -31,7 +31,12 @@ export class DashboardComponent implements OnInit {
       this.user = null;
     }
     this.leaveService.getLeaves().subscribe({
-      next: (data) => { this.leaves = Array.isArray(data) ? data : []; this.loading = false; },
+      next: (data) => {
+        this.leaves = (Array.isArray(data) ? data : [])
+          .slice()
+          .sort((a, b) => new Date((b as any).created_at).getTime() - new Date((a as any).created_at).getTime());
+        this.loading = false;
+      },
       error: () => { this.leaves = []; this.loading = false; }
     });
   }

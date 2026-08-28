@@ -72,10 +72,14 @@
   </div>
 
   <div class="action-btns" *ngIf="pendingFiles.length > 0">
-    <button class="btn btn-primary" (click)="uploadAll()" [disabled]="uploading">
+    <button class="btn btn-primary" (click)="uploadAll()" [disabled]="uploading || !leaveId" [attr.title]="!leaveId ? 'ไฟล์จะอัปโหลดอัตโนมัติเมื่อกดยื่นคำขอ' : ''">
       {{ uploading ? 'กำลังอัปโหลด...' : 'อัปโหลดไฟล์' }}
     </button>
   </div>
+  <p class="upload-hint-small" *ngIf="!leaveId && pendingFiles.length > 0">
+    <i class="fa-regular fa-circle-info"></i>
+    ไฟล์ที่เลือกไว้จะถูกอัปโหลดพร้อมยื่นคำขอ ไม่ต้องกดอัปโหลดแยก
+  </p>
 
   <div class="preview-overlay" *ngIf="previewFile" (click)="onOverlayClick($event)">
     <div class="preview-card" (click)="$event.stopPropagation()">

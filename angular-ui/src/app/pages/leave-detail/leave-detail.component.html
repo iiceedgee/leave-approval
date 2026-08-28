@@ -39,6 +39,12 @@
     <app-stepper [steps]="stepperSteps"></app-stepper>
   </div>
 
+  <div class="action-panel waiting-info" *ngIf="showHrWaitingInfo">
+    <h4>รอพนักงานอัปโหลดเอกสาร</h4>
+    <p>คำขอนี้อยู่สถานะ <strong>ยื่นคำขอ (SU)</strong> — ต้องให้พนักงานแนบไฟล์ก่อนจึงตรวจสอบได้ (SU → DC)</p>
+    <p class="muted">ถ้ามีไฟล์แล้วแต่ยังค้าง SU ให้พนักงานกดอัปโหลดซ้ำ หรือติดต่อผู้ดูแล</p>
+  </div>
+
   <div class="action-panel" *ngIf="canDoPretemp">
     <h4>ตรวจสอบเอกสาร (ความครบถ้วน)</h4>
     <app-upload-zone

@@ -269,7 +269,7 @@ export class UploadZoneComponent implements OnInit, OnDestroy, OnChanges {
       return;
     }
     if (!this.leaveId) {
-      this.toast.error('รหัสคำขอไม่ถูกต้อง');
+      this.toast.warning('ไฟล์จะถูกอัปโหลดเมื่อกดยื่นคำขอ');
       return;
     }
     this.uploading = true;

@@ -108,7 +108,9 @@ class InMemoryStore {
   }
 
   async listLeaves() {
-    return this.leaves.map(l => this._norm(l));
+    return this.leaves
+      .map(l => this._norm(l))
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }
 
   async updateLeave(id, fields) {
