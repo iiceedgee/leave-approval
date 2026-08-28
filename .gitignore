@@ -20,5 +20,8 @@ BUGFIX_REPORT.md
 DOCKER_CI_CD_GUIDE.md
 .opencode
 
+# Runtime logs
+*.log
+
 # All documentation kept local only (not pushed to GitHub)
 *.md
