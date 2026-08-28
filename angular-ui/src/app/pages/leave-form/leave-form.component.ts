@@ -136,6 +136,11 @@ export class LeaveFormComponent implements OnInit, OnDestroy {
       this.isError = true;
       return;
     }
+    if (!this.isResubmit && (!this.uploadZone || this.uploadZone.pendingFiles.length === 0)) {
+      this.msg = 'กรุณาแนบไฟล์อย่างน้อย 1 ไฟล์';
+      this.isError = true;
+      return;
+    }
 
     const data: CreateLeaveRequest = {
       leave_type: this.leaveType,
@@ -168,6 +173,8 @@ export class LeaveFormComponent implements OnInit, OnDestroy {
       next: async (res) => {
         this.tempLeaveId = res.id;
         this.showUploadSection = true;
+        // Fix race: Input [leaveId] ยังเป็น '' ตอน detectChanges ยังไม่ทัน — sync ตรงๆก่อน uploadAll
+        if (this.uploadZone) (this.uploadZone as any).leaveId = this.tempLeaveId;
 
         const hasPending = this.uploadZone?.pendingFiles?.length > 0;
 

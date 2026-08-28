@@ -99,7 +99,7 @@
            [attr.aria-expanded]="showUploadSection">
         <h3 class="section-title">
           <i class="fa-regular fa-file-lines"></i>
-          ไฟล์เอกสาร (ไม่บังคับ)
+          ไฟล์เอกสาร <span class="required">*</span>
         </h3>
         <span class="section-toggle">
           <i class="fa-solid" [class.fa-chevron-down]="showUploadSection" [class.fa-chevron-right]="!showUploadSection"></i>
@@ -109,8 +109,8 @@
       <div class="upload-body" [hidden]="!showUploadSection">
         <p class="upload-hint">
           <i class="fa-regular fa-circle-info"></i>
-          แนบไฟล์ประกอบคำขอลา เช่น ใบรับรองแพทย์ หรือเอกสารอื่น ๆ ที่เกี่ยวข้อง
-          (สูงสุด 10 ไฟล์, ไฟล์ละไม่เกิน 10MB, รองรับ .pdf .jpg .png .docx)
+          <span *ngIf="!isResubmit">บังคับแนบอย่างน้อย 1 ไฟล์ — ไฟล์จะถูกส่งพร้อมยื่นคำขอ (สูงสุด 10 ไฟล์, ไฟล์ละไม่เกิน 10MB, รองรับ .pdf .jpg .png .docx)</span>
+          <span *ngIf="isResubmit">แนบไฟล์ประกอบคำขอลา เช่น ใบรับรองแพทย์ หรือเอกสารอื่น ๆ ที่เกี่ยวข้อง (สูงสุด 10 ไฟล์, ไฟล์ละไม่เกิน 10MB, รองรับ .pdf .jpg .png .docx)</span>
         </p>
         <app-upload-zone
           #uploadZone

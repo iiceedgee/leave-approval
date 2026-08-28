@@ -173,26 +173,12 @@ export class LeaveDetailComponent implements OnInit, OnDestroy {
   }
 
   get canUploadDoc(): boolean {
-    // Emp can upload at SU (initial) and DC (until pretemp passes to MA)
-    // Also when flag_send_back=Y (needs to re-upload after send-back)
-    // Block terminal states MA/AP/RJ/CX explicitly
+    // ตรงๆ: แนบได้แค่ตอนถูกส่งกลับ flag Y — ยื่นใหม่บังคับไฟล์แล้วเลยไม่ต้องแนบซ้ำที่ Detail
     if (!this.leave || !this.user) return false;
     if (this.user?.role !== 'emp') return false;
     if (this.user?.id !== this.leave?.user_id) return false;
-
-    const status = this.leave.current_status;
-    // Terminal — cannot upload after manager stage or final states
-    if ([STATUS.MA.code, STATUS.AP.code, STATUS.RJ.code, STATUS.CX.code].includes(status as any)) {
-      // Even with flag Y, MA/AP/RJ/CX should not allow direct upload (must resubmit via form)
-      // But SU+Y is not terminal, so it will fall through to flag check above? Actually SU+Y is SU status, not terminal.
-      // So block here only for terminal statuses.
-      return false;
-    }
-
-    if (this.leave.flag_send_back === 'Y') return true;
-    if (status === STATUS.SU.code) return true;
-    if (status === STATUS.DC.code) return true;
-    return false;
+    if ([STATUS.MA.code, STATUS.AP.code, STATUS.RJ.code, STATUS.CX.code].includes(this.leave.current_status as any)) return false;
+    return this.leave.flag_send_back === 'Y';
   }
 
   get showApprovalPanel(): boolean {
