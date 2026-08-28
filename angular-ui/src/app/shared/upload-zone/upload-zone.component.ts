@@ -22,6 +22,7 @@ export class UploadZoneComponent implements OnInit, OnDestroy, OnChanges {
   @Input() getFilesFn?: () => Observable<UploadedFile[]>;
   @Input() deleteFn?: (fileId: string) => Observable<any>;
   @Input() canDelete: boolean | ((file: UploadedFile) => boolean) = true;
+  @Input() queueOnly = false;
   @Output() uploadComplete = new EventEmitter<File[]>();
 
   @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;

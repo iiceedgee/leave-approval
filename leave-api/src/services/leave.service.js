@@ -152,14 +152,14 @@ class LeaveService {
     return this.transition(leaveId, userId, role, STATUS.CX.code, remark);
   }
 
-  // แก้ไขหลังจากถูกส่งกลับ (flag_send_back → N)
+  // แก้ไขหลังจากถูกส่งกลับ (flag_send_back → N) — ส่งพร้อมไฟล์ทีเดียว ไม่แยกยิง file ก่อน
   async resubmit(leaveId, userId, data) {
-    if (!leaveId || !userId) return null;
+    if (!leaveId || !userId) return { error: 'พารามิเตอร์ไม่ครบ' };
     const leave = await this.db.getLeaveById(leaveId);
-    if (!leave) return null;
-    if (leave.user_id !== userId) return null;
-    if (leave.flag_send_back !== 'Y') return null;
-    if (leave.current_status !== STATUS.SU.code) return null;
+    if (!leave) return { error: 'ไม่พบคำขอ' };
+    if (leave.user_id !== userId) return { error: 'ไม่ใช่เจ้าของคำขอนี้' };
+    if (leave.flag_send_back !== 'Y') return { error: 'คำขอนี้ไม่ได้ถูกส่งกลับแก้ไข' };
+    if (leave.current_status !== STATUS.SU.code) return { error: 'สถานะปัจจุบันไม่ใช่รอแก้ไข (SU)' };
 
     const updateFields = { current_status: STATUS.DC.code, flag_send_back: 'N' };
     if (data.leave_type) updateFields.leave_type = data.leave_type;

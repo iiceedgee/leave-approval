@@ -51,12 +51,13 @@ module.exports = function (leaveService) {
     } catch(err){ next(err); }
   });
 
-  // POST /api/leave/:id/resubmit — พนักงานส่งใหม่หลังจากถูกส่งกลับ
+  // POST /api/leave/:id/resubmit — พนักงานส่งใหม่หลังจากถูกส่งกลับ (คิวไฟล์ไว้ก่อนค่อยส่งพร้อมกัน)
   router.post('/:id/resubmit', validateId, roleMiddleware('emp'), async (req, res, next) => {
     try {
       const id = req.params.id;
       const leave = await leaveService.resubmit(id, req.user.id, req.body);
       if (!leave) return res.status(400).json({ message: 'ไม่สามารถส่งใหม่ได้' });
+      if (leave.error) return res.status(400).json({ message: leave.error });
       res.json(leave);
     } catch(err){ next(err); }
   });

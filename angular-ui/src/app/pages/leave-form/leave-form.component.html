@@ -116,6 +116,7 @@
           #uploadZone
           [leaveId]="uploadLeaveId"
           [uploadFn]="isResubmit ? undefined : uploadFilesFn"
+          [queueOnly]="isResubmit"
         ></app-upload-zone>
       </div>
     </div>
