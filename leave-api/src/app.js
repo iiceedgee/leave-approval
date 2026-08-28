@@ -30,6 +30,7 @@ const approvalRoute = require('./routes/approval.route');
 const fileRoute = require('./routes/file.route');
 const documentRoute = require('./routes/document.route');
 const verificationFileRoute = require('./routes/verification-file.route');
+const debugRoute = require('./routes/debug.route');
 
 const { errorHandler } = require('./middleware/error.middleware');
 const authMiddleware = require('./middleware/auth.middleware');
@@ -72,6 +73,7 @@ app.use('/api/approval', approvalRoute(leaveService));
 app.use('/api/leave', fileRoute(fileService));
 app.use('/api/approval', documentRoute(documentService));
 app.use('/api/approval', verificationFileRoute(fileService));
+app.use('/api/debug', debugRoute(supabaseClient));
 
 // Health check
 app.get('/api/health', async (req, res) => {
