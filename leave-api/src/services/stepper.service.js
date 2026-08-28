@@ -2,19 +2,17 @@
  * Stepper Service — centralized status via ../constants/status
  * แทน cms_status ของ EEC แบบ in-code ไม่ต้อง JOIN
  * STATUS กลางอยู่ที่ leave-api/src/constants/status.js
- * Simplified flow: SU -> DC -> MA -> AP (VC deprecated, kept for legacy)
+ * Flow ย่อเหลือ 4 ขั้น: SU -> DC -> MA -> AP (VC ถูกรวมเข้ากับ DC)
  */
 'use strict';
 
 const { STATUS, getStatusThai } = require('../constants/status');
 
 const STEPPER_STEPS = [
-  { seq: 1, icon: 'fa-solid fa-file-pen',         name: 'ยื่นคำขอ',            status: STATUS.SU.code },
-  { seq: 2, icon: 'fa-solid fa-file-shield',      name: 'ตรวจสอบครบถ้วน',      status: STATUS.DC.code },
-  // VC step kept for backward compat with legacy leaves, displayed as pending/done when MA/AP
-  { seq: 3, icon: 'fa-solid fa-file-circle-check', name: 'ตรวจสอบถูกต้อง',      status: STATUS.VC.code },
-  { seq: 4, icon: 'fa-solid fa-user-check',       name: 'หัวหน้าอนุมัติ',       status: STATUS.MA.code },
-  { seq: 5, icon: 'fa-solid fa-circle-check',     name: 'เสร็จสิ้น',            status: STATUS.AP.code },
+  { seq: 1, icon: 'fa-solid fa-file-pen',    name: 'ยื่นคำขอ',       status: STATUS.SU.code },
+  { seq: 2, icon: 'fa-solid fa-file-shield', name: 'ตรวจสอบเอกสาร',  status: STATUS.DC.code },
+  { seq: 3, icon: 'fa-solid fa-user-check',  name: 'หัวหน้าอนุมัติ',  status: STATUS.MA.code },
+  { seq: 4, icon: 'fa-solid fa-circle-check',name: 'เสร็จสิ้น',       status: STATUS.AP.code },
 ];
 
 function getCurrentStepIndex(currentStatus, flagSendBack) {
@@ -26,11 +24,11 @@ function getCurrentStepIndex(currentStatus, flagSendBack) {
   }
   if (currentStatus === STATUS.SU.code) return 0;
   if (currentStatus === STATUS.DC.code) return 1;
-  if (currentStatus === STATUS.VC.code) return 2;
-  if (currentStatus === STATUS.MA.code) return 3;
+  if (currentStatus === STATUS.MA.code) return 2;
   if (currentStatus === STATUS.AP.code) return -1;
-  // รองรับ F เก่าให้มองเป็น SU
+  // รองรับ F/VC เก่าให้มองเป็น SU/DC เพื่อ backward compat
   if (currentStatus === 'F') return 0;
+  if (currentStatus === 'VC') return 1; // legacy VC → treat as DC
   return -1;
 }
 
@@ -63,28 +61,21 @@ function getStepperSteps(currentStatus, flagSendBack, history, role) {
       return 'pending';
     }
 
-    if (currentStatus === STATUS.DC.code) {
+    if (currentStatus === STATUS.DC.code || currentStatus === 'VC') {
       if (index === 0) return 'done';
       if (index === 1) return 'current';
       return 'pending';
     }
 
-    if (currentStatus === STATUS.VC.code) {
+    if (currentStatus === STATUS.MA.code) {
       if (index <= 1) return 'done';
       if (index === 2) return 'current';
       return 'pending';
     }
 
-    if (currentStatus === STATUS.MA.code) {
-      // Simplified: DC->MA skips VC, so consider VC as done as well
-      if (index <= 2) return 'done';
-      if (index === 3) return 'current';
-      return 'pending';
-    }
-
     if (currentStatus === STATUS.AP.code) {
-      if (index <= 3) return 'done';
-      if (index === 4) return 'done';
+      if (index <= 2) return 'done';
+      if (index === 3) return 'done';
       return 'pending';
     }
 
@@ -116,7 +107,7 @@ function buildHistoryTimeline(history) {
 
 function getApprovableSteps(role) {
   if (role === 'mgr') return ['หัวหน้าอนุมัติ'];
-  if (role === 'hr') return ['ตรวจสอบครบถ้วน']; // simplified: only pretemp
+  if (role === 'hr') return ['ตรวจสอบเอกสาร'];
   return [];
 }
 

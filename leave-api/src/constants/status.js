@@ -5,14 +5,11 @@
  * แทนตาราง cms_status ของระบบ EEC แต่เป็น in-code ไม่ต้อง JOIN
  * ไม่ต้องสร้างตาราง DB จริง — ใช้ constants เพื่อลดความซับซ้อนและเพิ่ม performance
  *
- * FLOW การเปลี่ยนสถานะ (Simplified — VC removed):
+ * FLOW การเปลี่ยนสถานะ (ย่อเหลือ 4 ขั้น — VC ถูกรวมเข้ากับ DC):
  *   SU (Submitted/ยื่นคำขอ)              -> DC, CX
- *   DC (DocCheck/รอตรวจสอบเอกสาร)        -> MA, SU, RJ  (pretemp pass -> MA, sendBack -> SU, reject -> RJ)
- *   VC (VerifyCheck/รอตรวจสอบความถูกต้อง)-> MA, SU, RJ  — @deprecated legacy, kept for backward compat
+ *   DC (DocCheck/รอตรวจสอบเอกสาร)        -> MA, SU, RJ
  *   MA (ManagerApproval/รอหัวหน้าอนุมัติ)-> AP, SB, RJ
  *   AP (Approved) / SB (SendBack) / CX (Cancelled) / RJ (Rejected) = ปลายทาง
- *
- * Legacy leaves ที่ค้าง VC ยังรองรับผ่าน document.service tempPass -> MA
  *
  * การใช้งาน:
  *   const { STATUS, FLOW, getStatusThai, getStatusEn, getStatusDesc } = require('../constants/status');
@@ -28,9 +25,7 @@
 
 const STATUS = {
   SU: { code: 'SU', th: 'ยื่นคำขอ', en: 'Submitted', desc: 'emp ยื่นคำขอ -> DC' },
-  DC: { code: 'DC', th: 'รอตรวจสอบเอกสาร', en: 'DocCheck', desc: 'รอ pretemp ตรวจครบถ้วน -> MA/SU/RJ (simplified, VC removed)' },
-  /** @deprecated VC removed — kept for backward compat with legacy leaves */
-  VC: { code: 'VC', th: 'รอตรวจสอบความถูกต้อง', en: 'VerifyCheck', desc: 'รอ temp ตรวจถูกต้อง -> MA/SU (deprecated, use DC->MA)' },
+  DC: { code: 'DC', th: 'รอตรวจสอบเอกสาร', en: 'DocCheck', desc: 'รอตรวจสอบเอกสาร (DC รวม VC) -> MA/SU/RJ' },
   MA: { code: 'MA', th: 'รอหัวหน้าอนุมัติ', en: 'ManagerApproval', desc: 'รอ mgr อนุมัติ -> AP/SB/RJ' },
   AP: { code: 'AP', th: 'อนุมัติแล้ว', en: 'Approved', desc: 'เสร็จสิ้น' },
   SB: { code: 'SB', th: 'ส่งกลับแก้ไข', en: 'SendBack', desc: 'ถูกส่งกลับ -> SU' },
@@ -41,7 +36,6 @@ const STATUS = {
 const FLOW = {
   SU: ['DC', 'CX'],
   DC: ['MA', 'SU', 'RJ'],
-  VC: ['MA', 'SU', 'RJ'], // legacy — kept so existing VC leaves can still transition
   MA: ['AP', 'SB', 'RJ'],
 };
 

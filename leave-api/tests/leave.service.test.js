@@ -1,13 +1,13 @@
 // =====================================================
-//  Unit Test สำหรับ LeaveService — State Gate
+//  Unit Test สำหรับ LeaveService — State Gate (ย่อเหลือ 4 ขั้น VC ถูกรวมเข้ากับ DC)
 //
 //  สิ่งที่ test:
 //  1. approve() — ต้อง status MA → AP, อย่างอื่น → error
-//  2. sendBack() — ต้อง status DC/VC/MA → SU, อย่างอื่น → error
-//  3. reject() — ต้อง status VC/MA → RJ, อย่างอื่น → error
+//  2. sendBack() — ต้อง status DC/MA → SU, อย่างอื่น → error (VC ถูกรวมแล้ว)
+//  3. reject() — ต้อง status DC/MA → RJ, อย่างอื่น → error (VC ถูกรวมเข้ากับ DC)
 //  4. cancel() — ต้อง status SU → CX, อย่างอื่น → error
 //  5. calcLeaveDays() — คำนวณวันลา
-//  6. Full workflow SU→DC→VC→MA→AP
+//  6. Full workflow SU→DC→MA→AP
 //
 //  หมายเหตุ: method ใน service เป็น async (เพราะ db อาจเป็น Supabase)
 //  → ทุก test ต้อง await
@@ -67,7 +67,7 @@ describe('LeaveService — approve', () => {
     expect(result.error).toBeTruthy();
   });
 
-  it('approve: status VC → ควร fail → ได้ error', async () => {
+  it('approve: status VC (legacy) → ควร fail → ได้ error', async () => {
     const leave = await createLeave(service);
     leave.current_status = 'VC';
 
@@ -102,12 +102,13 @@ describe('LeaveService — sendBack', () => {
     expect(result.flag_send_back).toBe('Y');
   });
 
-  it('sendBack: status VC → ควรผ่าน', async () => {
+  it('sendBack: status VC (legacy) → ยังผ่านแบบ backward compat (หรือ fail ถ้าตัด legacy ออก)', async () => {
     const leave = await createLeave(service);
     leave.current_status = 'VC';
 
     const result = await service.sendBack(leave.id, 1, 'mgr', 'ข้อมูลไม่ถูกต้อง');
-
+    // legacy VC still allowed via string fallback — expect SU, but strict new flow would be error
+    // Keep legacy: allow VC -> SU
     expect(result.current_status).toBe('SU');
   });
 
@@ -148,7 +149,16 @@ describe('LeaveService — reject', () => {
     service = new LeaveService(db);
   });
 
-  it('reject: status VC → ควรผ่าน → ได้ RJ', async () => {
+  it('reject: status DC → ควรผ่าน → ได้ RJ (DC รวม VC แล้ว)', async () => {
+    const leave = await createLeave(service);
+    leave.current_status = 'DC';
+
+    const result = await service.reject(leave.id, 1, 'hr', 'ข้อมูลไม่ถูกต้อง');
+
+    expect(result.current_status).toBe('RJ');
+  });
+
+  it('reject: status VC (legacy) → ยังผ่านแบบ backward compat', async () => {
     const leave = await createLeave(service);
     leave.current_status = 'VC';
 
@@ -168,15 +178,6 @@ describe('LeaveService — reject', () => {
 
   it('reject: status SU → ควร fail', async () => {
     const leave = await createLeave(service);
-
-    const result = await service.reject(leave.id, 1, 'mgr', '');
-
-    expect(result.error).toBeTruthy();
-  });
-
-  it('reject: status DC → ควร fail', async () => {
-    const leave = await createLeave(service);
-    leave.current_status = 'DC';
 
     const result = await service.reject(leave.id, 1, 'mgr', '');
 
@@ -239,7 +240,7 @@ describe('calcLeaveDays', () => {
   });
 });
 
-describe('Full Workflow — SU → DC → VC → MA → AP', () => {
+describe('Full Workflow — SU → DC → MA → AP (ย่อเหลือ 4 ขั้น)', () => {
   let service;
   let db;
 
@@ -248,7 +249,7 @@ describe('Full Workflow — SU → DC → VC → MA → AP', () => {
     service = new LeaveService(db);
   });
 
-  it('สร้าง → SU → DC → VC → MA → AP: approve ต้อง fail จนกว่าถึง MA', async () => {
+  it('สร้าง → SU → DC → MA → AP: approve ต้อง fail จนกว่าถึง MA', async () => {
     const leave = await createLeave(service);
 
     // สร้าง → status SU
@@ -257,15 +258,11 @@ describe('Full Workflow — SU → DC → VC → MA → AP', () => {
     // SU → approve ไม่ได้
     expect((await service.approve(leave.id, 1, 'mgr', '')).error).toBeTruthy();
 
-    // อัปโหลดเอกสาร → status DC
+    // อัปโหลดเอกสาร → status DC (VC ถูกรวมแล้ว)
     leave.current_status = 'DC';
     expect((await service.approve(leave.id, 1, 'mgr', '')).error).toBeTruthy();
 
-    // Pretemp Pass → status VC
-    leave.current_status = 'VC';
-    expect((await service.approve(leave.id, 1, 'mgr', '')).error).toBeTruthy();
-
-    // Temp Pass → status MA
+    // Pretemp Pass → status MA (DC->MA โดยตรง, ข้าม VC)
     leave.current_status = 'MA';
     // MA → approve ได้!
     const result = await service.approve(leave.id, 1, 'mgr', 'อนุมัติ');

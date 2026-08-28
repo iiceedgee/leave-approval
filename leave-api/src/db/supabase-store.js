@@ -102,8 +102,9 @@ class SupabaseStore {
   // insert + .select().single() = ส่งเข้าแล้วขอข้อมูลที่ insert กลับมา
   // (id, created_at ฯลฯ ที่ database สร้างให้)
   async createLeave(data) {
-    // Enforce defaults + whitelist — กัน client ส่ง current_status ผิดๆ มาทับ และกัน DB default ผิด (F) ของ prod เก่า
-    // ถ้ายังไม่มี request_no ให้ gen แบบรันไม่ซ้ำ LV-YYYY-XXXX
+    // Enforce defaults + whitelist — HOTFIX: รองรับทั้ง DB เก่า (F) และใหม่ (SU) เพื่อกัน drift
+    // Prod ตอนนี้ยังเป็น F (debug /api/debug/constraint เจอ current_status='F') แต่โค้ดส่ง SU -> violates check
+    // วิธีแก้: ลอง SU ก่อน ถ้าโดน check constraint (23514) ให้ fallback เป็น F อัตโนมัติ, พอ migration แล้ว SU จะผ่านทันที
     if (!data.request_no) {
       try { data.request_no = await this._nextRequestNo(); } catch {}
     }
@@ -113,12 +114,11 @@ class SupabaseStore {
       send_back_count: 0,
       ...data,
     };
-    // ถ้า client ส่ง SU/DC ฯลฯ มาให้ใช้ตามนั้น แต่ถ้าส่ง F หรือค่าผิดให้ fallback SU
-    const allowed = ['SU','DC','MA','AP','SB','CX','RJ'];
+    // whitelist ใหม่: รับทั้ง F (legacy) และ SU (new) — ถ้าไม่ใช่ทั้งคู่ให้ fallback SU
+    const allowed = ['SU', 'F', 'DC', 'MA', 'AP', 'SB', 'CX', 'RJ'];
     if (!allowed.includes(payload.current_status)) payload.current_status = 'SU';
-    // รองรับ prod เก่าที่ default เป็น F — ถ้า payload มี F ให้แก้เป็น SU ก่อน insert
-    if (payload.current_status === 'F') payload.current_status = 'SU';
-    // Retry 3 ครั้งกรณีเลขซ้ำ (unique violation) จาก concurrent
+
+    // Retry 3 ครั้งกรณีเลขซ้ำ (unique violation) จาก concurrent + fallback F<->SU
     for (let attempt = 0; attempt < 3; attempt++) {
       const { data: leave, error } = await this.supabase
         .from('leave_requests')
@@ -126,12 +126,25 @@ class SupabaseStore {
         .select()
         .single();
       if (!error) {
+        // Normalize F -> SU ขาออกให้ frontend ทั้งหมดเห็น SU
         if (leave && leave.current_status === 'F') {
-          console.warn('[DB] createLeave returned F — auto patch to SU', leave.id);
-          const patched = await this.updateLeave(leave.id, { current_status: 'SU' });
-          return patched || { ...leave, current_status: 'SU' };
+          return { ...leave, current_status: 'SU' };
         }
         return leave;
+      }
+      // ถ้า error เพราะ check constraint ของ current_status -> ลองสลับ SU <-> F
+      const isCheckViolation = error.code === '23514' && String(error.message).includes('current_status');
+      if (isCheckViolation) {
+        if (payload.current_status === 'SU') {
+          console.warn('[DB] createLeave SU rejected (old DB expects F) -> retry with F', JSON.stringify(error).slice(0,200));
+          payload.current_status = 'F';
+          continue;
+        }
+        if (payload.current_status === 'F') {
+          console.warn('[DB] createLeave F rejected (new DB expects SU) -> retry with SU', JSON.stringify(error).slice(0,200));
+          payload.current_status = 'SU';
+          continue;
+        }
       }
       // ถ้า error เพราะ request_no ซ้ำ (code 23505) ให้ gen ใหม่แล้วลองใหม่
       if (error.code === '23505' && String(error.message).includes('request_no')) {
@@ -144,7 +157,7 @@ class SupabaseStore {
         console.warn('[DB] request_no column missing, fallback insert without it');
         delete payload.request_no;
         const { data: leave2, error: err2 } = await this.supabase.from('leave_requests').insert(payload).select().single();
-        if (!err2) return leave2;
+        if (!err2) return leave2 ? (leave2.current_status === 'F' ? { ...leave2, current_status: 'SU' } : leave2) : leave2;
         console.error('[DB] createLeave error:', JSON.stringify(error, null, 2)); const e=new Error(err2.message); e.code=err2.code; e.details=err2.details; e.hint=err2.hint; throw e;
       }
       console.error('[DB] createLeave error:', JSON.stringify(error, null, 2)); const e=new Error(error.message); e.code=error.code; e.details=error.details; e.hint=error.hint; throw e;
@@ -170,14 +183,24 @@ class SupabaseStore {
   }
 
   async updateLeave(id, fields) {
-    const { data: leave, error } = await this.supabase
-      .from('leave_requests')
-      .update(fields)
-      .eq('id', id)
-      .select()
-      .single();
-    if (error) throw error;
-    return leave;
+    // HOTFIX: รองรับ SU<->F drift เหมือน createLeave — ถ้า update เป็น SU แล้วโดน check constraint ให้ลอง F
+    const tryUpdate = async (f) => {
+      const { data: leave, error } = await this.supabase.from('leave_requests').update(f).eq('id', id).select().single();
+      return { leave, error };
+    };
+    let { leave, error } = await tryUpdate(fields);
+    if (!error) return leave && leave.current_status === 'F' ? { ...leave, current_status: 'SU' } : leave;
+    const isCheckViolation = error.code === '23514' && String(error.message).includes('current_status');
+    if (isCheckViolation && fields.current_status) {
+      const alt = fields.current_status === 'SU' ? 'F' : fields.current_status === 'F' ? 'SU' : null;
+      if (alt) {
+        console.warn(`[DB] updateLeave ${fields.current_status} rejected -> retry ${alt}`, id);
+        const retryFields = { ...fields, current_status: alt };
+        const r2 = await tryUpdate(retryFields);
+        if (!r2.error) return r2.leave && r2.leave.current_status === 'F' ? { ...r2.leave, current_status: 'SU' } : r2.leave;
+      }
+    }
+    throw error;
   }
 
   // ---- history ----

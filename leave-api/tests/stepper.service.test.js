@@ -1,12 +1,11 @@
 // =====================================================
-//  Unit Test สำหรับ Stepper Service
+//  Unit Test สำหรับ Stepper Service — ย่อเหลือ 4 ขั้น (VC ถูกรวมเข้ากับ DC)
 //
-//  Stepper มี 5 ขั้น (Flow A: HR ตรวจ 2 ด่าน):
+//  Stepper มี 4 ขั้น (Flow ใหม่: HR ตรวจ 1 ด่าน):
 //  1. ยื่นคำขอ (SU)
-//  2. ตรวจสอบครบถ้วน (DC) — HR
-//  3. ตรวจสอบถูกต้อง (VC) — HR
-//  4. หัวหน้าอนุมัติ (MA) — MGR
-//  5. เสร็จสิ้น (AP)
+//  2. ตรวจสอบเอกสาร (DC) — HR (รวม VC)
+//  3. หัวหน้าอนุมัติ (MA) — MGR
+//  4. เสร็จสิ้น (AP)
 //
 //  แต่ละขั้นมี state: current | done | pending | cancelled | rejected
 // =====================================================
@@ -18,14 +17,14 @@ const {
 } = require('../src/services/stepper.service');
 
 describe('getStepperSteps — สถานะ SU (ยื่นคำขอ)', () => {
-  it('SU → step 1 = current, ที่เหลือ = pending', () => {
+  it('SU → step 1 = current, ที่เหลือ = pending (4 ขั้น)', () => {
     const steps = getStepperSteps('SU', 'N', []);
 
+    expect(steps.length).toBe(4);
     expect(steps[0].state).toBe('current'); // ยื่นคำขอ
     expect(steps[1].state).toBe('pending'); // ตรวจสอบเอกสาร
-    expect(steps[2].state).toBe('pending'); // หัวหน้าตรวจสอบ
-    expect(steps[3].state).toBe('pending'); // HR อนุมัติ
-    expect(steps[4].state).toBe('pending'); // เสร็จสิ้น
+    expect(steps[2].state).toBe('pending'); // หัวหน้าอนุมัติ
+    expect(steps[3].state).toBe('pending'); // เสร็จสิ้น
   });
 
   it('SU + flag_send_back=Y → step 1 = current', () => {
@@ -40,72 +39,75 @@ describe('getStepperSteps — สถานะ DC (รอตรวจสอบเ
   it('DC → step 1 = done, step 2 = current', () => {
     const steps = getStepperSteps('DC', 'N', []);
 
+    expect(steps.length).toBe(4);
     expect(steps[0].state).toBe('done');    // ยื่นคำขอ
     expect(steps[1].state).toBe('current'); // ตรวจสอบเอกสาร
-    expect(steps[2].state).toBe('pending');
+    expect(steps[2].state).toBe('pending'); // หัวหน้าอนุมัติ
+    expect(steps[3].state).toBe('pending'); // เสร็จสิ้น
   });
 });
 
-describe('getStepperSteps — สถานะ VC (ตรวจสอบความถูกต้อง)', () => {
-  it('VC → step 1-2 = done, step 3 = current', () => {
+describe('getStepperSteps — สถานะ VC (legacy — ถูกรวมเข้ากับ DC)', () => {
+  it('VC (legacy) → ควรทำเหมือน DC: step 1 = done, step 2 = current', () => {
     const steps = getStepperSteps('VC', 'N', []);
 
+    expect(steps.length).toBe(4);
     expect(steps[0].state).toBe('done');    // ยื่นคำขอ
-    expect(steps[1].state).toBe('done');    // ตรวจสอบครบถ้วน
-    expect(steps[2].state).toBe('current'); // ตรวจสอบถูกต้อง
+    expect(steps[1].state).toBe('current'); // ตรวจสอบเอกสาร (VC legacy -> DC)
+    expect(steps[2].state).toBe('pending');
     expect(steps[3].state).toBe('pending');
   });
 });
 
 describe('getStepperSteps — สถานะ MA (รอหัวหน้าอนุมัติ)', () => {
-  it('MA → step 1-3 = done, step 4 = current', () => {
+  it('MA → step 1-2 = done, step 3 = current', () => {
     const steps = getStepperSteps('MA', 'N', []);
 
+    expect(steps.length).toBe(4);
     expect(steps[0].state).toBe('done');    // ยื่นคำขอ
-    expect(steps[1].state).toBe('done');    // ตรวจสอบครบถ้วน
-    expect(steps[2].state).toBe('done');    // ตรวจสอบถูกต้อง
-    expect(steps[3].state).toBe('current'); // หัวหน้าอนุมัติ
-    expect(steps[4].state).toBe('pending');
+    expect(steps[1].state).toBe('done');    // ตรวจสอบเอกสาร
+    expect(steps[2].state).toBe('current'); // หัวหน้าอนุมัติ
+    expect(steps[3].state).toBe('pending'); // เสร็จสิ้น
   });
 });
 
 describe('getStepperSteps — สถานะ AP (อนุมัติแล้ว)', () => {
-  it('AP → step 1-3 = done, step 4-5 = done', () => {
+  it('AP → 4 ขั้น = done ทั้งหมด', () => {
     const history = [
       { status_code: 'SU', action_by_name: 'สมชาย', created_at: '2026-07-27' },
       { status_code: 'AP', action_by_name: 'สมชาย', created_at: '2026-07-28' },
     ];
     const steps = getStepperSteps('AP', 'N', history);
 
+    expect(steps.length).toBe(4);
     expect(steps[0].state).toBe('done');
     expect(steps[1].state).toBe('done');
     expect(steps[2].state).toBe('done');
     expect(steps[3].state).toBe('done');
-    expect(steps[4].state).toBe('done');
   });
 });
 
 describe('getStepperSteps — สถานะ CX (ยกเลิก)', () => {
-  it('CX → step 1 = done, ที่เหลือ = cancelled', () => {
+  it('CX → step 1 = done, ที่เหลือ = cancelled (4 ขั้น)', () => {
     const steps = getStepperSteps('CX', 'N', []);
 
+    expect(steps.length).toBe(4);
     expect(steps[0].state).toBe('done');
     expect(steps[1].state).toBe('cancelled');
     expect(steps[2].state).toBe('cancelled');
     expect(steps[3].state).toBe('cancelled');
-    expect(steps[4].state).toBe('cancelled');
   });
 });
 
 describe('getStepperSteps — สถานะ RJ (ไม่อนุมัติ)', () => {
-  it('RJ → step 1 = done, ที่เหลือ = rejected', () => {
+  it('RJ → step 1 = done, ที่เหลือ = rejected (4 ขั้น)', () => {
     const steps = getStepperSteps('RJ', 'N', []);
 
+    expect(steps.length).toBe(4);
     expect(steps[0].state).toBe('done');
     expect(steps[1].state).toBe('rejected');
     expect(steps[2].state).toBe('rejected');
     expect(steps[3].state).toBe('rejected');
-    expect(steps[4].state).toBe('rejected');
   });
 });
 
