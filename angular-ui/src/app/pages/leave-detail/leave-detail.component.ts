@@ -176,12 +176,8 @@ export class LeaveDetailComponent implements OnInit, OnDestroy {
     if (!this.leave || !this.user) return false;
     if (this.user?.role !== 'emp') return false;
     if (this.user?.id !== this.leave?.user_id) return false;
-    const status = this.leave.current_status;
-    if ([STATUS.MA.code, STATUS.AP.code, STATUS.RJ.code, STATUS.CX.code].includes(status as any)) return false;
-    if (this.leave.flag_send_back === 'Y') return true;
-    if (status === STATUS.SU.code) return true;
-    if (status === STATUS.DC.code) return true;
-    return false;
+    if ([STATUS.MA.code, STATUS.AP.code, STATUS.RJ.code, STATUS.CX.code].includes(this.leave.current_status as any)) return false;
+    return this.leave.flag_send_back === 'Y';
   }
 
   get showApprovalPanel(): boolean {
