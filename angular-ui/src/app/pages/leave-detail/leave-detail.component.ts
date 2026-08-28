@@ -173,12 +173,8 @@ export class LeaveDetailComponent implements OnInit, OnDestroy {
   }
 
   get canUploadDoc(): boolean {
-    // ตรงๆ: แนบได้แค่ตอนถูกส่งกลับ flag Y — ยื่นใหม่บังคับไฟล์แล้วเลยไม่ต้องแนบซ้ำที่ Detail
-    if (!this.leave || !this.user) return false;
-    if (this.user?.role !== 'emp') return false;
-    if (this.user?.id !== this.leave?.user_id) return false;
-    if ([STATUS.MA.code, STATUS.AP.code, STATUS.RJ.code, STATUS.CX.code].includes(this.leave.current_status as any)) return false;
-    return this.leave.flag_send_back === 'Y';
+    // เหลือทางเดียว: หลังส่งกลับให้ไปที่ฟอร์มเท่านั้น — ซ่อนแผงอัปโหลดบน Detail เพื่อไม่ให้งง
+    return false;
   }
 
   get showApprovalPanel(): boolean {
