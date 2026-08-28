@@ -173,22 +173,40 @@ export class LeaveDetailComponent implements OnInit, OnDestroy {
   }
 
   get canUploadDoc(): boolean {
+    // Emp can upload at SU (initial) and DC (until pretemp passes to MA)
+    // Also when flag_send_back=Y (needs to re-upload after send-back)
+    // Block terminal states MA/AP/RJ/CX explicitly
     if (!this.leave || !this.user) return false;
     if (this.user?.role !== 'emp') return false;
     if (this.user?.id !== this.leave?.user_id) return false;
-    if ([STATUS.MA.code, STATUS.AP.code, STATUS.RJ.code, STATUS.CX.code].includes(this.leave.current_status as any)) return false;
-    return this.leave.flag_send_back === 'Y';
+
+    const status = this.leave.current_status;
+    // Terminal — cannot upload after manager stage or final states
+    if ([STATUS.MA.code, STATUS.AP.code, STATUS.RJ.code, STATUS.CX.code].includes(status as any)) {
+      // Even with flag Y, MA/AP/RJ/CX should not allow direct upload (must resubmit via form)
+      // But SU+Y is not terminal, so it will fall through to flag check above? Actually SU+Y is SU status, not terminal.
+      // So block here only for terminal statuses.
+      return false;
+    }
+
+    if (this.leave.flag_send_back === 'Y') return true;
+    if (status === STATUS.SU.code) return true;
+    if (status === STATUS.DC.code) return true;
+    return false;
   }
 
   get showApprovalPanel(): boolean {
+    // Plan A — strict separation: approval panel only at MA (never at DC)
     return this.leave?.current_status === STATUS.MA.code && (this.canApprove || this.canSendBack || this.canReject);
   }
 
-  // HR/MGR ดู SU แล้วไม่เห็นปุ่ม — บอกเหตุผลแทนจอว่าง
-  get showHrWaitingInfo(): boolean {
-    if (!this.leave || !this.user) return false;
-    if (this.leave.current_status !== STATUS.SU.code) return false;
-    return this.user.role === 'hr' || this.user.role === 'mgr';
+  get isWaitingForUpload(): boolean {
+    return this.leave?.current_status === STATUS.SU.code;
+  }
+
+  get shouldShowWaitingForHr(): boolean {
+    const isHrOrMgr = this.user?.role === 'hr' || this.user?.role === 'mgr';
+    return !!isHrOrMgr && this.isWaitingForUpload;
   }
 
   /** Disabled state for DC send-back / reject buttons — requires remark + not loading */

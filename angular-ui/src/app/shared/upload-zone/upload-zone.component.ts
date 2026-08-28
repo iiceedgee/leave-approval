@@ -286,8 +286,12 @@ export class UploadZoneComponent implements OnInit, OnDestroy, OnChanges {
       throw err;
     }
     try {
-      await firstValueFrom(obs.pipe(takeUntil(this.destroy$)));
-      this.toast.success('อัปโหลดไฟล์เรียบร้อย');
+      const res: any = await firstValueFrom(obs.pipe(takeUntil(this.destroy$)));
+      if (res && res.autoTransitionOk === false) {
+        this.toast.warning(res.warning || 'อัปโหลดสำเร็จแต่สถานะไม่เปลี่ยน กรุณารีเฟรช');
+      } else {
+        this.toast.success('อัปโหลดไฟล์เรียบร้อย');
+      }
       this.uploadComplete.emit(files);
       this.loadExistingFiles();
     } catch (err: any) {

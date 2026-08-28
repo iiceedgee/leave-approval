@@ -137,13 +137,6 @@ export class LeaveFormComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // บังคับมีไฟล์ตอนยื่นง่ายสุด — create flow ต้องแนบอย่างน้อย 1 ไฟล์ (resubmit ผ่าน detail upload ได้)
-    if (!this.isResubmit && (!this.uploadZone || this.uploadZone.pendingFiles.length === 0)) {
-      this.msg = 'กรุณาแนบไฟล์อย่างน้อย 1 ไฟล์';
-      this.isError = true;
-      return;
-    }
-
     const data: CreateLeaveRequest = {
       leave_type: this.leaveType,
       start_date: this.startDate,

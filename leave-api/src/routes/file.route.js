@@ -110,13 +110,12 @@ module.exports = function (fileService) {
         }
 
         // Auto transition: SU -> DC เมื่อ emp อัปโหลดเอกสารครั้งแรก
-        // Fix: ถ้าเป็น SU+Y (ถูกส่งกลับ) ต้อง clear flag_send_back -> N และตั้ง DC
+        let autoTransitionOk = true;
+        let autoTransitionErr = null;
         if (leave.current_status === STATUS.SU.code && req.user.role === 'emp') {
           try {
             const updatePayload = { current_status: STATUS.DC.code };
-            if (leave.flag_send_back === 'Y') {
-              updatePayload.flag_send_back = 'N';
-            }
+            if (leave.flag_send_back === 'Y') updatePayload.flag_send_back = 'N';
             await db.updateLeave(leaveId, updatePayload);
             await db.addHistory({
               leave_request_id: leaveId,
@@ -125,12 +124,18 @@ module.exports = function (fileService) {
               action_role: 'emp',
               remark: leave.flag_send_back === 'Y' ? 'อัปโหลดเอกสารใหม่หลังส่งกลับ' : 'อัปโหลดเอกสารแล้ว',
             });
+            console.log('[file.route] auto SU->DC OK', leaveId);
           } catch (transErr) {
-            console.error('[file.route] auto SU->DC transition failed:', transErr.message);
-            // ไม่ fail upload ถ้า transition พัง — แจ้งเตือนแต่ยัง return files
+            autoTransitionOk = false;
+            autoTransitionErr = transErr.message;
+            console.error('[file.route] auto SU->DC FAILED:', transErr.message, transErr.code);
           }
         }
 
+        // Plan A: ถ้า auto fail ให้ frontend รู้ — ส่ง warning header + body
+        if (!autoTransitionOk) {
+          return res.status(201).json({ files, warning: 'อัปโหลดสำเร็จแต่เปลี่ยนสถานะไม่สำเร็จ: ' + autoTransitionErr, autoTransitionOk: false });
+        }
         res.status(201).json(files);
       } catch (err) {
         console.error('[file.route] POST /:id/files error', err);
