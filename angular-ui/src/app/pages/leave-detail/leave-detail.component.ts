@@ -1,7 +1,7 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { Subject, forkJoin } from 'rxjs';
-import { takeUntil } from 'rxjs/operators';
+import { Subject, forkJoin, of } from 'rxjs';
+import { catchError, finalize, map, switchMap, takeUntil } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
 import { LeaveService } from '../../services/leave.service';
 import { ToastService } from '../../shared/toast/toast.service';
@@ -69,37 +69,33 @@ export class LeaveDetailComponent implements OnInit, OnDestroy {
       return;
     }
     this.loading = true;
-    this.leaveService.getLeave(id).pipe(takeUntil(this.destroy$)).subscribe({
-      next: (leave) => {
-        if (!leave || !leave.id) {
-          this.loading = false;
-          this.toast.error('ไม่พบข้อมูลคำขอ');
-          return;
-        }
+    this.leaveService.getLeave(id).pipe(
+      takeUntil(this.destroy$),
+      switchMap(leave => {
+        if (!leave || !leave.id) throw new Error('leave not found');
         this.leave = leave;
-        // stepper/history ต้องไม่ทำให้หน้าค้างถ้าพัง — catch แยก
-        forkJoin([
-          this.leaveService.getStepper(id).pipe(takeUntil(this.destroy$)),
-          this.leaveService.getHistory(id).pipe(takeUntil(this.destroy$)),
-        ]).pipe(takeUntil(this.destroy$)).subscribe({
-          next: ([steps, items]) => {
-            this.stepperSteps = Array.isArray(steps) ? steps : [];
-            this.timelineItems = Array.isArray(items) ? items : [];
-            this.loading = false;
-          },
-          error: (err) => {
-            console.error('[leave-detail] load stepper/history failed', err);
-            this.stepperSteps = [];
-            this.timelineItems = [];
-            this.loading = false;
-          },
-        });
+        return forkJoin({
+          steps: this.leaveService.getStepper(id).pipe(catchError(err => { console.error('[stepper]', err); return of([] as StepperStep[]); })),
+          items: this.leaveService.getHistory(id).pipe(catchError(err => { console.error('[history]', err); return of([] as TimelineItem[]); }))
+        }).pipe(
+          map(({ steps, items }) => ({ leave, steps, items })),
+          catchError(err => { console.error('[forkJoin]', err); return of({ leave, steps: [] as StepperStep[], items: [] as TimelineItem[] }); })
+        );
+      }),
+      finalize(() => this.loading = false),
+      takeUntil(this.destroy$)
+    ).subscribe({
+      next: ({ leave, steps, items }) => {
+        this.leave = leave;
+        this.stepperSteps = Array.isArray(steps) ? steps : [];
+        this.timelineItems = Array.isArray(items) ? items : [];
       },
       error: (err) => {
-        console.error('[leave-detail] load leave failed', err);
-        this.loading = false;
+        console.error('[leave-detail] load failed', err);
         this.toast.error(err?.error?.message || err?.message || 'โหลดข้อมูลล้มเหลว');
-      },
+        this.stepperSteps = [];
+        this.timelineItems = [];
+      }
     });
   }
 

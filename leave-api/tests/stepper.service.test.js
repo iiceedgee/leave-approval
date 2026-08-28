@@ -87,31 +87,56 @@ describe('getStepperSteps — สถานะ AP (อนุมัติแล้
   });
 });
 
-describe('getStepperSteps — สถานะ CX (ยกเลิก)', () => {
-  it('CX → step 1 = done, ที่เหลือ = cancelled (4 ขั้น)', () => {
+describe('getStepperSteps — สถานะ CX (ยกเลิก) — polymorphic final', () => {
+  it('CX (empty history) → only final = cancelled, first = done (fallback)', () => {
     const steps = getStepperSteps('CX', 'N', []);
-
     expect(steps.length).toBe(4);
     expect(steps[0].state).toBe('done');
-    expect(steps[1].state).toBe('cancelled');
-    expect(steps[2].state).toBe('cancelled');
+    expect(steps[1].state).toBe('pending');
+    expect(steps[2].state).toBe('pending');
+    expect(steps[3].state).toBe('cancelled');
+    expect(steps[3].name).toBe('ยกเลิก');
+  });
+  it('CX at SU (history SU) → [done, pending, pending, cancelled]', () => {
+    const history = [{ status_code: 'SU' }];
+    const steps = getStepperSteps('CX', 'N', history);
+    expect(steps[0].state).toBe('done');
+    expect(steps[1].state).toBe('pending');
+    expect(steps[2].state).toBe('pending');
     expect(steps[3].state).toBe('cancelled');
   });
 });
 
-describe('getStepperSteps — สถานะ RJ (ไม่อนุมัติ)', () => {
-  it('RJ → step 1 = done, ที่เหลือ = rejected (4 ขั้น)', () => {
+describe('getStepperSteps — สถานะ RJ (ไม่อนุมัติ) — polymorphic final', () => {
+  it('RJ (empty history fallback) → only final = rejected', () => {
     const steps = getStepperSteps('RJ', 'N', []);
-
     expect(steps.length).toBe(4);
     expect(steps[0].state).toBe('done');
-    expect(steps[1].state).toBe('rejected');
-    expect(steps[2].state).toBe('rejected');
+    expect(steps[1].state).toBe('pending');
+    expect(steps[2].state).toBe('pending');
+    expect(steps[3].state).toBe('rejected');
+    expect(steps[3].name).toBe('ไม่อนุมัติ');
+    expect(steps[3].icon).toBe('fa-solid fa-circle-xmark');
+  });
+  it('RJ at DC → history SU,DC → [done,done,pending,rejected]', () => {
+    const history = [{ status_code: 'SU' }, { status_code: 'DC' }];
+    const steps = getStepperSteps('RJ', 'N', history);
+    expect(steps[0].state).toBe('done');
+    expect(steps[1].state).toBe('done');
+    expect(steps[2].state).toBe('pending');
+    expect(steps[3].state).toBe('rejected');
+  });
+  it('RJ at MA → history SU,DC,MA → [done,done,done,rejected]', () => {
+    const history = [{ status_code: 'SU' }, { status_code: 'DC' }, { status_code: 'MA' }];
+    const steps = getStepperSteps('RJ', 'N', history);
+    expect(steps[0].state).toBe('done');
+    expect(steps[1].state).toBe('done');
+    expect(steps[2].state).toBe('done');
     expect(steps[3].state).toBe('rejected');
   });
 });
 
-describe('buildHistoryTimeline', () => {
+describe('buildHistoryTimeline — polymorphic terminal', () => {
   it('ไม่มี history → ได้ 1 รายการ state=current ชื่อ "รอดำเนินการ"', () => {
     const timeline = buildHistoryTimeline([]);
 
@@ -142,6 +167,22 @@ describe('buildHistoryTimeline', () => {
     const timeline = buildHistoryTimeline(history);
 
     expect(timeline[0].name).toBe('ยื่นคำขอ');
+  });
+
+  it('RJ → state rejected (timeline dot แดง)', () => {
+    const history = [
+      { status_code: 'SU', action_by_name: 'สมชาย', action_role: 'emp', remark: 'ยื่นคำขอ', created_at: '2026-07-27' },
+      { status_code: 'RJ', action_by_name: 'มานะ', action_role: 'mgr', remark: 'เอกสารไม่ครบ', created_at: '2026-07-28' },
+    ];
+    const timeline = buildHistoryTimeline(history);
+    expect(timeline[1].state).toBe('rejected');
+    expect(timeline[1].name).toBe('ไม่อนุมัติ: เอกสารไม่ครบ');
+  });
+
+  it('CX → state cancelled', () => {
+    const history = [{ status_code: 'CX', action_by_name: 'สมชาย', action_role: 'emp', remark: 'ยกเลิก', created_at: '2026-07-27' }];
+    const timeline = buildHistoryTimeline(history);
+    expect(timeline[0].state).toBe('cancelled');
   });
 });
 

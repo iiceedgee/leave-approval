@@ -12,7 +12,13 @@
 .stepper-detail-marker.current .stepper-detail-line { background: linear-gradient(to bottom, #0E3362 0%, #d9dee7 100%); }
 .stepper-detail-marker.done .stepper-detail-dot { background: #d9dee7; border-color: #c7cfdb; }
 .stepper-detail-marker.done .stepper-detail-line { background: #d9dee7; }
+.stepper-detail-marker.rejected .stepper-detail-dot { background: #c62828; border-color: #c62828; }
+.stepper-detail-marker.rejected .stepper-detail-line { background: #ef9a9a; }
+.stepper-detail-marker.cancelled .stepper-detail-dot { background: #c62828; border-color: #c62828; opacity: .85; }
+.stepper-detail-marker.cancelled .stepper-detail-line { background: #ef9a9a; opacity: .7; }
 .stepper-detail-content.current .stepper-detail-title { color: #0E3362; }
 .stepper-detail-content.pending .stepper-detail-title { color: #99a3b3; }
 .stepper-detail-content.done .stepper-detail-title { color: #6b7685; }
+.stepper-detail-content.rejected .stepper-detail-title { color: #c62828; }
+.stepper-detail-content.cancelled .stepper-detail-title { color: #c62828; opacity: .9; }
 .empty-msg { text-align: center; padding: 24px; color: #999; }

@@ -8,12 +8,36 @@
 
 const { STATUS, getStatusThai } = require('../constants/status');
 
-const STEPPER_STEPS = [
+const BASE_STEPS = [
   { seq: 1, icon: 'fa-solid fa-file-pen',    name: 'ยื่นคำขอ',       status: STATUS.SU.code },
   { seq: 2, icon: 'fa-solid fa-file-shield', name: 'ตรวจสอบเอกสาร',  status: STATUS.DC.code },
   { seq: 3, icon: 'fa-solid fa-user-check',  name: 'หัวหน้าอนุมัติ',  status: STATUS.MA.code },
-  { seq: 4, icon: 'fa-solid fa-circle-check',name: 'เสร็จสิ้น',       status: STATUS.AP.code },
 ];
+
+// Polymorphic final — อนุมัติ/ไม่อนุมัติ/ยกเลิก ใช้ slot เดียวกัน (seq 4) สลับ icon/name/state ตาม terminal
+function getFinalStep(currentStatus) {
+  if (currentStatus === STATUS.RJ.code) return { seq: 4, icon: 'fa-solid fa-circle-xmark', name: 'ไม่อนุมัติ', status: STATUS.RJ.code };
+  if (currentStatus === STATUS.CX.code) return { seq: 4, icon: 'fa-solid fa-ban',           name: 'ยกเลิก',    status: STATUS.CX.code };
+  return { seq: 4, icon: 'fa-solid fa-circle-check', name: 'เสร็จสิ้น', status: STATUS.AP.code };
+}
+
+// For backward compat keep STEPPER_STEPS as 4-step AP variant
+const STEPPER_STEPS = [...BASE_STEPS, getFinalStep(STATUS.AP.code)];
+
+function getMaxReachedIndex(history, currentStatus) {
+  const map = { SU: 0, F: 0, DC: 1, VC: 1, MA: 2, AP: 3 };
+  let max = -1;
+  (history || []).forEach(h => {
+    if (h.status_code === STATUS.RJ.code || h.status_code === STATUS.CX.code || h.status_code === STATUS.SB.code) return;
+    if (map[h.status_code] != null) max = Math.max(max, map[h.status_code]);
+  });
+  if (currentStatus && map[currentStatus] != null && currentStatus !== STATUS.RJ.code && currentStatus !== STATUS.CX.code) {
+    max = Math.max(max, map[currentStatus]);
+  }
+  // Terminal with empty history — at least show first step as done (ยื่นคำขอ)
+  if (max === -1 && (currentStatus === STATUS.RJ.code || currentStatus === STATUS.CX.code)) max = 0;
+  return max;
+}
 
 function getCurrentStepIndex(currentStatus, flagSendBack) {
   if (currentStatus === STATUS.CX.code || currentStatus === STATUS.RJ.code) {
@@ -33,21 +57,20 @@ function getCurrentStepIndex(currentStatus, flagSendBack) {
 }
 
 function getStepperSteps(currentStatus, flagSendBack, history, role) {
-  const currentIndex = getCurrentStepIndex(currentStatus, flagSendBack);
-
-  let lastApprovedIndex = -1;
-  if (history && history.length > 0) {
-    for (let i = history.length - 1; i >= 0; i--) {
-      if (history[i].status_code === STATUS.AP.code) {
-        const stepIdx = STEPPER_STEPS.findIndex(s => s.status === STATUS.AP.code);
-        lastApprovedIndex = Math.max(lastApprovedIndex, stepIdx);
-      }
-    }
-  }
+  const steps = [...BASE_STEPS, getFinalStep(currentStatus)];
+  const maxReached = getMaxReachedIndex(history, currentStatus);
 
   const stepState = (step, index) => {
-    if (currentStatus === STATUS.CX.code) return index <= 0 ? 'done' : 'cancelled';
-    if (currentStatus === STATUS.RJ.code) return index <= 0 ? 'done' : 'rejected';
+    // Terminal polymorphic — only final step (seq 4) is rejected/cancelled, 0-2 done/pending by how far it reached
+    if (currentStatus === STATUS.AP.code) return 'done';
+    if (currentStatus === STATUS.RJ.code) {
+      if (index === 3) return 'rejected';
+      return index <= maxReached ? 'done' : 'pending';
+    }
+    if (currentStatus === STATUS.CX.code) {
+      if (index === 3) return 'cancelled';
+      return index <= maxReached ? 'done' : 'pending';
+    }
     if (flagSendBack === 'Y' && index === 0) return 'current';
     if (flagSendBack === 'Y') return 'pending';
 
@@ -73,16 +96,10 @@ function getStepperSteps(currentStatus, flagSendBack, history, role) {
       return 'pending';
     }
 
-    if (currentStatus === STATUS.AP.code) {
-      if (index <= 2) return 'done';
-      if (index === 3) return 'done';
-      return 'pending';
-    }
-
     return 'pending';
   };
 
-  return STEPPER_STEPS.map((step, index) => ({
+  return steps.map((step, index) => ({
     seq: step.seq,
     icon: step.icon,
     name: step.name,
@@ -96,13 +113,20 @@ function buildHistoryTimeline(history) {
     return [{ state: 'current', name: 'รอดำเนินการ', time: null }];
   }
 
-  return history.map((h, i) => ({
-    state: i === history.length - 1 ? 'current' : 'done',
-    name: `${getStatusThai(h.status_code)}${h.remark ? ': ' + h.remark : ''}`,
-    actionBy: h.action_by_name || '',
-    actionRole: h.action_role || '',
-    time: h.created_at,
-  }));
+  return history.map((h, i) => {
+    const isLast = i === history.length - 1;
+    let state = isLast ? 'current' : 'done';
+    if (h.status_code === STATUS.RJ.code) state = 'rejected';
+    else if (h.status_code === STATUS.CX.code) state = 'cancelled';
+    else if (h.status_code === STATUS.SB.code) state = isLast ? 'current' : 'done';
+    return {
+      state,
+      name: `${getStatusThai(h.status_code)}${h.remark ? ': ' + h.remark : ''}`,
+      actionBy: h.action_by_name || '',
+      actionRole: h.action_role || '',
+      time: h.created_at,
+    };
+  });
 }
 
 function getApprovableSteps(role) {

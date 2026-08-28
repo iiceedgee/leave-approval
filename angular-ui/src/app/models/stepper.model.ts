@@ -7,7 +7,8 @@ export interface StepperStep {
 }
 
 export interface TimelineItem {
-  state: 'current' | 'done' | 'pending';
+  // rejected/cancelled ONLY on terminal RJ/CX (polymorphic final) — synced with backend buildHistoryTimeline
+  state: 'current' | 'done' | 'pending' | 'cancelled' | 'rejected';
   name: string;
   actionBy: string;
   actionRole: string;

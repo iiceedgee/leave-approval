@@ -39,7 +39,7 @@
 .step.pending .label { color: #C4C4C4; }
 .step.pending .step-line { background-color: #C4C4C4; }
 
-// ยกเลิก/ไม่อนุมัติ = แดง
+// ยกเลิก/ไม่อนุมัติ = แดง — polymorphic final (seq 4) สลับจาก เสร็จสิ้น เขียว
 .step.cancelled .icon-container,
 .step.rejected .icon-container { color: #c62828; }
 
@@ -48,3 +48,7 @@
 
 .step.cancelled .label,
 .step.rejected .label { color: #c62828; }
+
+// เน้นขั้นสุดท้ายเมื่อเป็น terminal (reject/cancel) — เงาเบาๆ
+.step.rejected:last-child .icon-container,
+.step.cancelled:last-child .icon-container { filter: drop-shadow(0 0 2px rgba(198,40,40,.35)); }
