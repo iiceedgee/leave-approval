@@ -116,7 +116,7 @@ class InMemoryStore {
   async updateLeave(id, fields) {
     const leave = this.leaves.find(l => l.id === id);
     if (!leave) return null;
-    Object.assign(leave, fields);
+    Object.assign(leave, { ...fields, updated_at: new Date().toISOString() });
     return leave;
   }
 
