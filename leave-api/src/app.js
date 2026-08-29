@@ -40,11 +40,11 @@ const auditLogMiddleware = require('./middleware/audit-log.middleware');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// CORS: ถ้ามี FRONTEND_URL ให้ล็อคตาม env (รองรับหลาย origin คั่นด้วย ,), ถ้าไม่มีให้เปิดทั้งหมด dev
+// CORS: ถ้ามี FRONTEND_URL ให้ล็อคตาม env (รองรับหลาย origin คั่นด้วย ,), ถ้าไม่มีให้ล็อค allow-list dev
 const corsOptions = {
   origin: process.env.FRONTEND_URL
     ? process.env.FRONTEND_URL.split(',').map(s => s.trim()).filter(Boolean)
-    : true,
+    : ['http://localhost:4200', 'http://localhost:3000'],
   credentials: true,
 };
 app.use(cors(corsOptions));

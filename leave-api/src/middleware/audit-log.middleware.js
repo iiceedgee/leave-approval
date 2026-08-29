@@ -6,7 +6,10 @@ module.exports = function (store) {
 
     const start = process.hrtime.bigint();
 
+    let done = false;
     const log = () => {
+      if (done) return;
+      done = true;
       if (!res.writableFinished) return;
       const entry = {
         method: req.method,
@@ -23,8 +26,7 @@ module.exports = function (store) {
       }
     };
 
-    res.on('finish', log);
-    res.on('close', log);
+    res.once('finish', log);
 
     next();
   };
