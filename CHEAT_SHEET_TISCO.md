@@ -887,3 +887,72 @@ hr       | all  + DC เท่านั้น       | DC แดง              
 
 **ยืนยัน Q70 29 ส.ค. 2026 (B ทำแล้ว):** `supabase-store.js:189` `leave.service.js:174` `upload-zone.ts:31,98` `upload-zone.html:18` | **Phase A next:** `rpc_resubmit_with_files` ถ้าจะทำ transaction ไฟล์+history ก้อนเดียว
 
+---
+
+## ส่วนที่ 11: P0+P1+P2 29 ส.ค. 2026 — สรุปพร้อมตอบพรุ่งนี้ (ท่อง 3 นาที)
+
+> P0+P1 ปิดแล้ว `612fc14 + 5e61387` + P2 `7c8c30d sequence` — พร้อม loop `SU→DC→MA→AP` ด้วย `emp01/mgr01/hr01` + `npm test 53 passed`
+
+| ตัว | ทำอะไร | ไฟล์:บรรทัด | ตอบกรรมการ 1 ประโยค |
+|---|---|---|---|
+| **P0** | `rate limiter 10 req/min` กัน brute-force `/api/auth` | `app.js:50` `express-rate-limit` | กันยิง login รัวๆ |
+| **P0** | ปิด `debug` ใน prod ต้อง `ENABLE_DEBUG=1` | `app.js:78` `if(ENABLE_DEBUG)` | ไม่ให้ `GET /constraint` leak `keyPrefix` |
+| **P1** | `SU→DC` แบบ `WHERE flag/status` กัน 2 tab ชน | `file.route.js:149` `updateLeaveWhere` | `UPDATE WHERE flag='Y' RETURNING` ได้ 0 แถว = `409 ชน` |
+| **P1** | `verification-file` กันเกิน 5 + ชื่อซ้ำให้ตรง `file.route` | `verification-file.route.js:56` | ปิด drift โควตา 3 routes |
+| **P2** | `request_no` ใช้ `sequence nextval` แทน `MAX+1` | `supabase-store.js:82` `migration_next_request_no.sql` | `nextval` atomic กัน 2 คนกดพร้อมกันได้ `LV-2026-0001/0002` ไม่ซ้ำ |
+
+---
+
+### Q71: `app.js:50` ทำไมต้อง `rate limiter 10 req/min` ที่ `/api/auth`?
+
+*   **โค้ด:** `app.js:50-58` `rateLimit({windowMs:60*1000, max:10, keyGenerator: ip, handler: 429})` เฉพาะ `app.use('/api/auth', limiter)`
+*   **ถาม:** ถ้าไม่ใส่ brute-force จะยิง `POST /api/auth/login` ได้เท่าไหร่?
+*   **ตอบสั้น (ท่อง 20 วิ):** ไม่ใส่ยิงได้ไม่จำกัด `emp01:123456` ลองผิดถูกได้หลายพันครั้ง/นาทีครับ ใส่ `10 req/min/IP` ที่ `app.js:50` กัน brute-force เกิน `10` ได้ `429 Too Many Requests` + `Retry-After` ครับ `P0 Prod Blocker` ปิดก่อนขึ้น Prod ทันที
+*   **ไฟล์:** `app.js:50`
+*   **กับดัก:** "ไม่ต้อง limit เพราะมี JWT แล้ว"
+
+---
+
+### Q72: `app.js:78` ทำไม `debug` ต้องปิดใน prod?
+
+*   **โค้ด:** `app.js:78` `if(process.env.ENABLE_DEBUG==='1') app.use('/api/debug', debugRoute)` + `debug.route.js:7` `router.get('/constraint')` leak `keyPrefix/statusCounts`
+*   **ถาม:** `GET /api/debug/constraint` เปิด prod จะ leak อะไร?
+*   **ตอบสั้น:** leak `SUPABASE_URL/keyPrefix 20 ตัว/VERCEL flag/statusCounts` ที่ `debug.route.js:42-66` ทุกคนยิงได้ไม่ต้อง login — ปิด prod ถ้าไม่เปิด `ENABLE_DEBUG=1` ครับ
+*   **ไฟล์:** `app.js:78` `debug.route.js:7`
+*   **กับดัก:** "เปิดไว้ให้ FE ดู constraint"
+
+---
+
+### Q73: `file.route.js:149` ทำไม `SU→DC` ต้อง `WHERE flag/status`?
+
+*   **โค้ด:** `file.route.js:149` `db.updateLeaveWhere(id, {current_status:'DC'}, {flag_send_back:'Y', current_status:'SU'})` + `store.js:121` + `supabase-store.js:189` `UPDATE ... WHERE flag='Y' RETURNING`
+*   **ถาม:** 2 tab กด `ส่งคำขออีกครั้ง` พร้อมกัน `09:00:00.001` จะเกิดอะไร?
+*   **ตอบสั้น:** เดิมอ่าน `SU,Y` ได้ทั้งคู่แล้ว `UPDATE` ชนกัน ตอนนี้รวมเป็น query เดียว `WHERE flag='Y' AND status='SU'` ถ้า tab แรกชิงได้ 1 แถว `200` tab หลังได้ `0 แถว` เราเช็ค `if(!data) return 409 คำขอนี้ถูกส่งไปแล้ว กำลังรีเฟรช` ไม่ใช่ `400` ครับ — ต่อยอด `Q70` แต่ใช้กับ `SU→DC`
+*   **ไฟล์:** `file.route.js:149` `supabase-store.js:189`
+*   **กับดัก:** "มี Gate แล้วไม่ต้อง WHERE"
+
+---
+
+### Q74: `verification-file.route.js:56` ทำไมต้อง sync โควตา 5 ไฟล์ให้ตรง 3 routes?
+
+*   **โค้ด:** `file.route.js:40` `upload.array('files',5)` + `verification-file.route.js:56` กันเกิน 5 + กันชื่อซ้ำเหมือน `file.route.js:75` + `upload.middleware.js:62` `files:5`
+*   **ถาม:** ถ้า `file.route` กัน 5 แต่ `verification-file` ไม่กันจะเกิดอะไร?
+*   **ตอบสั้น:** drift ครับ `emp` แนบ `SU` กัน 5 แต่ `hr` ตรวจ `DC` แนบเพิ่มได้ 10 เกินโควตา ตอนนี้ sync `verification-file.route.js:56` กันเกิน 5 + กันชื่อซ้ำรวมไฟล์เดิมเหมือน `file.route` ทั้ง 3 routes ตรงกันแล้ว
+*   **ไฟล์:** `verification-file.route.js:56` `file.route.js:75`
+*   **กับดัก:** "คนละ route ไม่ต้องตรงกัน"
+
+---
+
+### Q75: `supabase-store.js:82` ทำไม `request_no` ต้องใช้ `sequence` แทน `MAX+1`? [P2 ที่เพิ่งทำ]
+
+*   **โค้ด:** `supabase-store.js:82-124` `_nextRequestNo(){ try{ rpc('next_request_no') } catch fallback MAX+1 }` + `sql/migration_next_request_no.sql` `CREATE SEQUENCE leave_request_no_seq` + `CREATE FUNCTION next_request_no() RETURNS TEXT AS $$ nextval() $$`
+*   **ถาม:** 2 คนกด `ยื่นคำขอ` พร้อมกัน `MAX+1` จะซ้ำไหม?
+*   **ตอบสั้น (ท่อง 30 วิ — ต่อ Q47):** เดิม `MAX+1` ที่ `supabase-store.js:86` `SELECT max request_no +1` 2 คนอ่าน `LV-2026-0005` ค่าเดียวกัน `09:00:00.001` ได้ `0006` ซ้ำกัน คนที่ 2 โดน `23505` แล้ว retry 3 รอบที่ `150` ถูไถได้แต่เปลืองครับ ตอนนี้ `P2` ทำ `SEQUENCE nextval` ที่ `migration_next_request_no.sql:15,19` `nextval('leave_request_no_seq')` เป็น **atomic ใน Postgres** เรียกพร้อมกันได้ `0006/0007` ไม่ซ้ำเลย ไม่ต้อง retry โค้ดยัง fallback `MAX+1` ถ้า rpc ยังไม่ deploy กันพังก่อนรัน migration ครับ
+*   **ไฟล์:** `supabase-store.js:82` `migration_next_request_no.sql:15,19`
+*   **กับดัก:** "มี retry 3 ครั้งพอแล้ว" / "`COUNT+1` ปลอดภัย"
+*   **วิธี deploy:** รัน `migration_next_request_no.sql` ใน `Supabase SQL Editor` ครั้งเดียว `SELECT next_request_no();` ได้ `LV-2026-XXXX`
+
+> **สรุป Q71-Q75:** `Q71` กัน brute-force `10/min` `Q72` ปิด debug prod `Q73` `WHERE flag/status` กันชน `Q74` sync โควตา 5 ไฟล์ 3 routes `Q75` `sequence nextval` กันเลขซ้ำ — `P0+P1` ปิด `P2` ตัวเดียวที่คุ้ม `sequence` ทำแล้ว ที่เหลือ `audit/pagination/noti` ไว้หลังสัมภาษณ์ (ท่องว่า `Phase 6 ย้ายลง DB` ก็พอ)
+
+**ยืนยัน P0+P1+P2 29 ส.ค. 2026:** `app.js:50,78` `file.route.js:149` `verification-file.route.js:56` `supabase-store.js:82` `migration_next_request_no.sql` | **Build:** `npm test 53 passed` | **Loop:** `emp01/mgr01/hr01 SU→DC→MA→AP ✔`
+
