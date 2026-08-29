@@ -6,19 +6,19 @@
 .stepper-detail-content { flex: 1 1 auto; min-height: 16px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; }
 .stepper-detail-title { font-size: 15px; font-weight: 600; color: #1f2d3d; line-height: 1.2; }
 .stepper-detail-sub { font-size: 12px; color: #888; margin-top: 2px; }
-.stepper-detail-marker.pending .stepper-detail-dot { background: #ffffff; border-color: #c7cfdb; }
+.stepper-detail-marker.pending .stepper-detail-dot { background: #ffffff; border-color: #C4C4C4; }
 .stepper-detail-marker.pending .stepper-detail-line { background: #e5e9f0; }
 .stepper-detail-marker.current .stepper-detail-dot { background: #0E3362; border-color: #0E3362; }
 .stepper-detail-marker.current .stepper-detail-line { background: linear-gradient(to bottom, #0E3362 0%, #d9dee7 100%); }
-.stepper-detail-marker.done .stepper-detail-dot { background: #d9dee7; border-color: #c7cfdb; }
-.stepper-detail-marker.done .stepper-detail-line { background: #d9dee7; }
+.stepper-detail-marker.done .stepper-detail-dot { background: #2e7d32; border-color: #2e7d32; }
+.stepper-detail-marker.done .stepper-detail-line { background: #2e7d32; opacity: .35; }
 .stepper-detail-marker.rejected .stepper-detail-dot { background: #c62828; border-color: #c62828; }
 .stepper-detail-marker.rejected .stepper-detail-line { background: #ef9a9a; }
 .stepper-detail-marker.cancelled .stepper-detail-dot { background: #c62828; border-color: #c62828; opacity: .85; }
 .stepper-detail-marker.cancelled .stepper-detail-line { background: #ef9a9a; opacity: .7; }
 .stepper-detail-content.current .stepper-detail-title { color: #0E3362; }
-.stepper-detail-content.pending .stepper-detail-title { color: #99a3b3; }
-.stepper-detail-content.done .stepper-detail-title { color: #6b7685; }
+.stepper-detail-content.pending .stepper-detail-title { color: #C4C4C4; }
+.stepper-detail-content.done .stepper-detail-title { color: #2e7d32; }
 .stepper-detail-content.rejected .stepper-detail-title { color: #c62828; }
 .stepper-detail-content.cancelled .stepper-detail-title { color: #c62828; opacity: .9; }
 .empty-msg { text-align: center; padding: 24px; color: #999; }

@@ -27,7 +27,7 @@
   <div class="file-list" *ngIf="pendingFiles.length > 0">
     <div class="file-item" *ngFor="let file of pendingFiles; let i = index">
       <i class="fa-regular fa-file"></i>
-      <span class="file-name">{{ file.name }}</span>
+      <span class="file-name" [attr.title]="file.name">{{ file.name }}</span>
       <span class="file-size">{{ formatFileSize(file.size) }}</span>
       <button type="button" class="file-action-btn" (click)="removePending(i)"
               [attr.aria-label]="'ลบไฟล์ ' + file.name">✕</button>
@@ -44,7 +44,7 @@
         (click)="downloadFile(file.id, file.original_name)"
         (keydown.enter)="downloadFile(file.id, file.original_name)"
         (keydown.space)="downloadFile(file.id, file.original_name); $event.preventDefault()"
-        title="ดาวน์โหลด"
+        [attr.title]="file.original_name"
       >
         {{ file.original_name }}
       </span>
@@ -67,8 +67,12 @@
     </div>
   </div>
 
-  <div class="file-list empty-files" *ngIf="existingFileList.length === 0 && !loading">
+  <div class="file-list empty-files" *ngIf="existingFileList.length === 0 && pendingFiles.length === 0 && !loading">
     <p class="empty-text">— ยังไม่มีเอกสาร —</p>
+  </div>
+
+  <div class="pending-hint" *ngIf="pendingFiles.length > 0 && existingFileList.length === 0 && !loading">
+    <p class="pending-text"><i class="fa-regular fa-circle-info"></i> มีไฟล์รออัปโหลด {{ pendingFiles.length }} ไฟล์ — จะถูกส่งพร้อม{{ queueOnly ? 'ส่งคำขออีกครั้ง' : 'ยื่นคำขอ' }}</p>
   </div>
 
   <div class="action-btns" *ngIf="pendingFiles.length > 0 && !queueOnly">
@@ -78,7 +82,7 @@
   </div>
   <p class="upload-hint-small" *ngIf="(!leaveId || queueOnly) && pendingFiles.length > 0">
     <i class="fa-regular fa-circle-info"></i>
-    ไฟล์ที่เลือกไว้จะถูกอัปโหลดพร้อม{{ queueOnly ? 'ส่งคำขออีกครั้ง' : 'ยื่นคำขอ' }} ไม่ต้องกดอัปโหลดแยก
+    ไฟล์ที่เลือกไว้จะถูกอัปโหลดพร้อม{{ queueOnly ? 'ส่งคำขออีกครั้ง' : 'ยื่นคำขอ' }} ไม่ต้องกดอัปโหลดแยก · สูงสุด 5 ไฟล์ · 10MB/ไฟล์
   </p>
 
   <div class="preview-overlay" *ngIf="previewFile" (click)="onOverlayClick($event)">

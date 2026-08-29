@@ -319,6 +319,12 @@ $transition:             0.2s ease;
   color: #1565c0;
 }
 
+.status-warning {
+  background: #fff8e1;
+  color: #f57f17;
+  border: 1px solid #ffe082;
+}
+
 .status-other {
   background: $color-badge-bg;
   color: $color-text-secondary;
