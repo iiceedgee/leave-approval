@@ -181,6 +181,7 @@ class SupabaseStore {
     const { data } = await this.supabase
       .from('leave_requests')
       .select('*')
+      .order('updated_at', { ascending: false })
       .order('created_at', { ascending: false })
       .order('request_no', { ascending: false });
     return (data || []).map(l => this._normalizeLeave(l));

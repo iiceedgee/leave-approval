@@ -34,9 +34,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     }
     this.leaveService.getLeaves().pipe(takeUntil(this.destroy$)).subscribe({
       next: (data) => {
-        this.leaves = (Array.isArray(data) ? data : [])
-          .slice()
-          .sort((a, b) => new Date((b as any).created_at).getTime() - new Date((a as any).created_at).getTime());
+        this.leaves = Array.isArray(data) ? data : [];
         this.loading = false;
       },
       error: () => { this.leaves = []; this.loading = false; }

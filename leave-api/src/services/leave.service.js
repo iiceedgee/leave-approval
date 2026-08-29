@@ -65,10 +65,8 @@ class LeaveService {
       leaves = allLeaves.filter(l => l.user_id === userId);
     }
 
-    // เพิ่มชื่อเจ้าของคำขอ (owner_name) ให้ทุกรายการ — ใช้กับหน้า dashboard (เรียงใหม่ → เก่า)
-    return leaves
-      .map(l => ({ ...l, owner_name: nameMap.get(l.user_id) || l.user_id }))
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    // เพิ่มชื่อเจ้าของคำขอ (owner_name) — เรียงจาก DB แล้ว (updated_at DESC) ไม่ต้อง sort ซ้ำ
+    return leaves.map(l => ({ ...l, owner_name: nameMap.get(l.user_id) || l.user_id }));
   }
 
   async getById(id) {

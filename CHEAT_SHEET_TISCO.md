@@ -735,3 +735,26 @@ Login(public) → Dashboard(AuthGuard, title ตาม role emp:ของฉั�
 
 **ยืนยัน Q57-Q63 28 ส.ค. 2026:** `dashboard.component.html:52,60`, `dashboard.component.ts:58`, `dashboard.component.scss:6-9`, `debug.route.js:8-10,100`, `leave-detail.html:42-46,88-92`, `leave-detail.ts:124,179,188`, `leave-form.html:118-119,121-126`, `leave-form.scss:285`, `timeline.component.scss:9-14`, `leave-history.component.scss:322,356`, `upload-zone.component.html:74`, `upload-zone.scss:56`, `file.route.js:61,66,83,90,115`, `document.service.js:15`, `app-routing.module.ts:12`, `status.js:27,38` | **P2 next:** `MAX_FILES constant`, `design-tokens.scss`, `firstValueFrom`, `rpc FOR UPDATE`, `RLS enable`, `notifications Realtime`
 
+---
+
+### Q64: 🔃 ยื่นใหม่ควรขึ้นหน้าไหม? ทำไมต้อง `updated_at DESC` + ลบ sort ซ้ำ?
+
+*   **โค้ด:** `supabase-store.js:184 ORDER BY updated_at DESC, created_at DESC` `store.js:110 sort updated_at` `leave.service.js:68-70` ลบ sort ซ้ำ `dashboard.component.ts:35-40` ลบ sort ซ้ำ `notification-bell.ts:126 sort updated_at` `schema.sql:35 updated_at` `migration_add_updated_at_index.sql`
+*   **คำถามไทย:** "พี่ยื่นใบใหม่แล้วหาไม่เจอ ต้องเลื่อนหาล่างสุดเลยเหรอครับ?"
+*   **คำตอบไทยละเอียด:**
+    *   **ขึ้นหน้า ไม่ใช่ต่อท้าย:** นี่คือ `work queue` ไม่ใช่ `log` — `Dashboard` คิว `mgr/hr` ต้องเห็นงานใหม่/งานที่ขยับล่าสุดบนสุดทันที ถ้าต่อท้าย `mgr` จะพลาดใบใหม่ต้องเลื่อนหา ส่วน `History /my-leaves/history` เป็น `archive` ยัง `created_at DESC` ถูกต้องแล้ว
+    *   **ทำไม `updated_at` ไม่ใช่ `created_at`:** `created_at` คือวันยื่นครั้งแรก ถ้าใบ `SB → SU → ส่งกลับ` แก้แล้วส่งใหม่ `created_at` ยังเก่าอยู่ จะจมล่าง แต่ `updated_at` จะใหม่เด้งขึ้นบน — ตรงกับ `Bell` ที่ `notification-bell.ts:126` ใช้ `updated_at DESC slice 10` อยู่แล้ว เดิม `Dashboard` ใช้ `created_at DESC` 3 ชั้นเลยไม่ตรงกัน (`Bell` เด้งแต่ `Dashboard` ไม่เด้ง)
+    *   **ลบ sort ซ้ำ 3 ชั้น:** เดิม `supabase-store.js:184 ORDER BY created_at` → `leave.service.js:71 sort created_at` → `dashboard.component.ts:39 sort created_at` ซ้ำ 3 รอบ เปลืองและแก้ที่ DB อย่างเดียวไม่พอ ตอนนี้แก้ต้นน้ำ `supabase-store ORDER BY updated_at DESC, created_at DESC` ชั้นเดียว แล้วลบ 2 ชั้นหลังทิ้ง ให้เชื่อ DB
+*   **Answer EN:** "New submissions must appear on top — it's a work queue, not a log. Use `updated_at DESC` so resubmitted `SB→SU` items bounce to top; `created_at` would keep them buried. Previously Bell used `updated_at` (correct) while Dashboard used `created_at` (mismatch) with triple sorting; now DB is single source `ORDER BY updated_at DESC` and duplicate sorts are removed."
+*   **ไฟล์:บรรทัด:** `supabase-store.js:184`, `store.js:110-114`, `leave.service.js:68-70`, `dashboard.component.ts:35-40`, `notification-bell.component.ts:126`, `schema.sql:35`, `migration_add_updated_at_index.sql:8-12`
+*   **กับดักห้ามพูด:** "ยื่นใหม่ต่อท้ายก็ได้" / "`created_at` พอแล้ว" / "sort 3 ชั้นไม่เป็นไรเผื่อไว้" / "Bell กับ Dashboard ไม่ต้องตรงกัน"
+*   **วิธีแก้ตรงไปตรงมา:** `supabase-store.js:184` เปลี่ยนเป็น `ORDER BY updated_at DESC, created_at DESC` + `store.js:110` `updated_at||created_at` + ลบ `leave.service.js:71 sort` + ลบ `dashboard.component.ts:39 sort` + สร้าง `migration_add_updated_at_index.sql` 2 index แล้วรันใน Supabase SQL Editor ครั้งเดียว
+
+> **สรุป Q64 (Sorting):** `ยื่นใหม่ขึ้นหน้า` ด้วย `updated_at DESC` ให้ `Bell` กับ `Dashboard` ตรงกัน + `History` ยัง `created_at DESC` + ลบ triple sort เหลือ DB ชั้นเดียว + เพิ่ม `idx_leave_updated_at` — ตอบกรรมการว่า "คิวงานต้อง LIFO ไม่ใช่ FIFO" ครับ
+
+**ยืนยัน Q64 29 ส.ค. 2026:** `supabase-store.js:184`, `store.js:110`, `leave.service.js:68`, `dashboard.component.ts:35`, `notification-bell.ts:126`, `schema.sql:35`, `migration_add_updated_at_index.sql:8` | **P2 next:** `status priority CASE WHEN DC/MA THEN 0` + `pagination`
+
+---
+
+> **สรุป Q57-Q64 (P1.5 + Sorting):** `Q57` badge ส่งกลับ `Q58` debug `Q59` SU/MA banner `Q60` 5 ไฟล์ `Q61` polish `Q62` stage `Q63` sitemap `Q64` **Sorting `updated_at DESC` ขึ้นหน้า + ลบ sort ซ้ำ + index** — พร้อมตอบกรรมการ 29 ส.ค. 2026
+

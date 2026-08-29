@@ -110,7 +110,12 @@ class InMemoryStore {
   async listLeaves() {
     return this.leaves
       .map(l => this._norm(l))
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      .sort((a, b) => {
+        const tb = new Date(b.updated_at || b.created_at).getTime();
+        const ta = new Date(a.updated_at || a.created_at).getTime();
+        if (tb !== ta) return tb - ta;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
   }
 
   async updateLeave(id, fields) {
