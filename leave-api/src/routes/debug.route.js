@@ -1,7 +1,13 @@
 const { Router } = require('express');
+const authMiddleware = require('../middleware/auth.middleware');
+const roleMiddleware = require('../middleware/role.middleware');
 
 module.exports = function (supabaseClient) {
   const router = Router();
+
+  // P0 Security: all debug routes require authenticated admin
+  router.use(authMiddleware);
+  router.use(roleMiddleware('admin'));
 
   // GET /api/debug/constraint - dump current_status constraint + column info
   router.get('/constraint', async (req, res) => {
@@ -39,11 +45,9 @@ module.exports = function (supabaseClient) {
         out.pgConstraintFetch = { status: resp.status, body: text.slice(0, 2000) };
       } catch (e) { out.pgConstraintFetchError = e.message; }
 
-      // Try to leak env for debugging (masked)
+      // Env masked — no secrets leaked
       out.env = {
         url: process.env.SUPABASE_URL,
-        keyLen: (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '').length,
-        keyPrefix: (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '').slice(0, 20),
         VERCEL: process.env.VERCEL,
       };
 
@@ -83,16 +87,16 @@ module.exports = function (supabaseClient) {
 
       res.json(out);
     } catch (e) {
-      res.status(500).json({ error: e.message, stack: e.stack });
+      res.status(500).json({ error: e.message });
     }
   });
 
-  // POST /api/debug/fix - run migration to fix constraint (requires ?key=SECRET)
+  // POST /api/debug/fix - run migration to fix constraint (requires x-fix-key header)
   router.post('/fix', async (req, res) => {
     try {
-      const secret = req.query.key || req.headers['x-fix-key'];
-      if (secret !== process.env.FIX_KEY && secret !== 'fix-2026-leave') {
-        return res.status(403).json({ message: 'forbidden - need ?key=fix-2026-leave or FIX_KEY env' });
+      const secret = req.headers['x-fix-key'] || req.query.key;
+      if (!process.env.FIX_KEY || secret !== process.env.FIX_KEY) {
+        return res.status(403).json({ message: 'forbidden - invalid FIX_KEY' });
       }
 
       const pg = require('pg');
@@ -132,7 +136,7 @@ module.exports = function (supabaseClient) {
       await client.end();
       res.json({ success: true, steps });
     } catch (e) {
-      res.status(500).json({ error: e.message, stack: e.stack });
+      res.status(500).json({ error: e.message });
     }
   });
 
