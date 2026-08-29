@@ -95,7 +95,8 @@ export class UploadZoneComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   private addFiles(files: File[]): void {
-    const remaining = Math.max(0, this.maxFiles - this.pendingFiles.length);
+    const occupied = this.pendingFiles.length + this.existingFileList.length;
+    const remaining = Math.max(0, this.maxFiles - occupied);
     const toAdd = files.slice(0, remaining);
     const allowedExtensions = this.accept.split(',').map(s => s.trim().toLowerCase());
 
@@ -109,11 +110,18 @@ export class UploadZoneComponent implements OnInit, OnDestroy, OnChanges {
         this.toast.warning(`ไฟล์ ${file.name} มีขนาดใหญ่กว่า ${this.maxSizeMB}MB`);
         continue;
       }
+      const nameLower = file.name.toLowerCase();
+      const dupPending = this.pendingFiles.some(p => p.name.toLowerCase() === nameLower);
+      const dupExisting = this.existingFileList.some(e => (e.original_name || '').toLowerCase() === nameLower);
+      if (dupPending || dupExisting) {
+        this.toast.warning(`ไฟล์ ${file.name} ซ้ำกับไฟล์ที่มีอยู่แล้ว`);
+        continue;
+      }
       this.pendingFiles.push(file);
     }
 
     if (files.length > remaining) {
-      this.toast.warning(`สามารถอัปโหลดได้สูงสุด ${this.maxFiles} ไฟล์`);
+      this.toast.warning(`สามารถอัปโหลดได้สูงสุด ${this.maxFiles} ไฟล์ (รวมไฟล์เดิม ${this.existingFileList.length} ไฟล์)`);
     }
   }
 

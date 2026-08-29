@@ -76,6 +76,34 @@ module.exports = function (fileService) {
           return res.status(400).json({ message: 'กรุณาเลือกไฟล์อย่างน้อย 1 ไฟล์' });
         }
 
+        // กันเกินโควตา 5 ไฟล์/คำขอ + กันชื่อซ้ำ (รวมไฟล์เดิม)
+        try {
+          const existingFiles = await fileService.getFiles(leaveId);
+          const totalAfter = (existingFiles?.length || 0) + req.files.length;
+          if (totalAfter > 5) {
+            if (!process.env.VERCEL) {
+              for (const f of req.files) { try { if (f.path) require('fs').unlinkSync(f.path); } catch {} }
+            }
+            return res.status(400).json({ message: `อัปโหลดได้สูงสุด 5 ไฟล์ (มีอยู่แล้ว ${existingFiles.length} ไฟล์ จะเพิ่มอีก ${req.files.length} ไฟล์ รวมเป็น ${totalAfter} ไฟล์)` });
+          }
+          const existingNames = new Set((existingFiles || []).map(x => (x.original_name || '').toLowerCase()));
+          const seen = new Set();
+          for (const f of req.files) {
+            let dec = f.originalname || '';
+            try { dec = Buffer.from(dec, 'latin1').toString('utf8'); } catch {}
+            dec = dec.toLowerCase();
+            if (existingNames.has(dec) || seen.has(dec)) {
+              if (!process.env.VERCEL) {
+                for (const x of req.files) { try { if (x.path) require('fs').unlinkSync(x.path); } catch {} }
+              }
+              return res.status(400).json({ message: `ไฟล์ชื่อซ้ำ: ${f.originalname} มีอยู่แล้ว` });
+            }
+            seen.add(dec);
+          }
+        } catch (countErr) {
+          console.error('[file.route] count/duplicate check error', countErr.message);
+        }
+
         // ตรวจสอบ stage & สิทธิ์ตาม role
         let stage = 'emp';
         if (req.user.role !== 'emp') {
@@ -101,6 +129,15 @@ module.exports = function (fileService) {
             files.push(await fileService.saveFile(leaveId, req.user.id, f, stage));
           } catch (saveErr) {
             console.error('[file.route] saveFile failed:', saveErr.message);
+            // cleanup ไฟล์ที่ save ไปแล้วบางส่วนเพื่อไม่ให้ค้างครึ่งๆ กลางๆ
+            if (files.length > 0) {
+              for (const saved of files) {
+                try { await fileService.deleteFile(leaveId, saved.id, req.user.id); } catch {}
+              }
+            }
+            if (!process.env.VERCEL) {
+              for (const r of req.files) { try { if (r.path) require('fs').unlinkSync(r.path); } catch {} }
+            }
             // Handle storage errors gracefully (Supabase/Vercel)
             if (saveErr.message && saveErr.message.includes('Upload failed')) {
               return res.status(502).json({ message: 'อัปโหลดไฟล์ล้มเหลว (storage)', error: saveErr.message });
