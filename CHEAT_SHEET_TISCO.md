@@ -758,3 +758,112 @@ Login(public) → Dashboard(AuthGuard, title ตาม role emp:ของฉั�
 
 > **สรุป Q57-Q64 (P1.5 + Sorting):** `Q57` badge ส่งกลับ `Q58` debug `Q59` SU/MA banner `Q60` 5 ไฟล์ `Q61` polish `Q62` stage `Q63` sitemap `Q64` **Sorting `updated_at DESC` ขึ้นหน้า + ลบ sort ซ้ำ + index** — พร้อมตอบกรรมการ 29 ส.ค. 2026
 
+---
+
+## ส่วนที่ 9: Notification Bell — Senior แยก 2 แกน Visibility vs Actionability (แก้แล้ว 29 ส.ค. 2026)
+
+> ✨ Senior 40 ปีเลือก **แก้ Phase A ให้ badge แม่นก่อน — Phase B วาด Design ไว้ตอบแต่ยังไม่โค้ด** — เหตุผล: ถ้า logic `ใครต้องทำ` ยังผิด สร้างตารางใหม่ก็ผิดเหมือนเดิม
+
+### ภาพรวม 2 แกน (ท่อง 30 วิ)
+
+| แกน | ถามอะไร | คำตอบ |
+|---|---|---|
+| **Visibility (เห็นได้)** | ใครมีสิทธิ์เห็นใบนี้ | `emp=own` `mgr=dept` `hr=all` ที่ `leave.service.js:47` — อันนี้ถูกแล้วไม่แตะ |
+| **Actionability (ต้องทำ)** | ใครต้องกดต่อ | `emp=SB(Y) ต้องแก้` `mgr=MA/DC ต้องอนุมัติ/ตรวจ` `hr=DC ต้องตรวจ` ที่ `notification-bell.ts:99 isActionRequired` |
+
+> Bell เดิม `slice(0,10)` ทุกสถานะ → `AP` 100 ใบบัง `MA` ที่ต้องทำ — ตอนนี้กรองเหลือแค่ที่ต้องทำ
+
+### Matrix ที่วาดบน Whiteboard ได้เลย
+
+```
+         | เห็นได้ (GET /api/leave) | Badge แดง (ต้องทำ) | ใน Bell โชว์อะไร
+emp      | own only                | SB(Y) แดง          | SB แดง + AP/RJ เทา FYI
+mgr      | dept + DC/MA เท่านั้น    | MA เข้ม / DC อ่อน    | แค่ DC/MA จบแล้วหายไป Dashboard
+hr       | all  + DC เท่านั้น       | DC แดง              | แค่ DC จบแล้วหายไป AuditLog
+```
+
+*   **FYI เทา** = โชว์แต่ `isRead=true` ไม่นับ badge ที่ `toNotification:171`
+*   **Action แดง** = `isActionRequired=true && !alreadyRead` ที่ `isActionRequired:99` + `toNotification:168`
+
+### Senior เลือกอะไรก่อน (ตอบกรรมการประโยคเดียว)
+
+> "ผมแก้ Phase A ให้ badge แม่นก่อนครับ — `notification-bell.ts:124 handleLeaves` กรอง `mgr→DC/MA hr→DC` + `isActionRequired:99` + `getStorageKey:46 prefix userId` + `sort Action ก่อน 150-158` — พอ logic ถูกแล้ว Phase B แค่ย้ายที่เก็บจาก `localStorage` ไป `DB notifications` ไม่ต้องรื้อ Bell ครับ hook เตรียมไว้แล้วที่ `fetchNotifications:74`"
+
+---
+
+### Q65: Bell แบ่ง role ยังไง? ทำไมไม่ใช่แค่ emp เห็นของ emp?
+
+*   **โค้ด:** `leave.service.js:47-71` Visibility + `notification-bell.ts:99 isActionRequired` + `124 handleLeaves` + `74 fetchNotifications` hook Phase B
+*   **คำถามไทย:** "พนักงานเห็นแค่ของตัวเองพอไหมครับ? ทำไมต้องซับซ้อนกว่านั้น?"
+*   **คำตอบไทยละเอียด:** "Visibility อย่างเดียวไม่พอครับ ต้องแยก 2 แกนครับ 1) Visibility `emp=own mgr=dept hr=all` ที่ `leave.service.js:47` 2) Actionability `isActionRequired:99` ที่ Bell `emp: SU+Y (ส่งกลับต้องแก้) / mgr: DC|MA / hr: DC` แยก **Action แดง (ต้องกด)** vs **FYI เทา (แค่รู้ผล AP/RJ)** ที่ `toNotification:171` `!needsCheck → isRead=true` ครับ เดิม Bell `slice(0,10)` ทุกสถานะทำให้ `mgr` เห็น `AP` 100 ใบ บัง `MA` ที่ต้องอนุมัติ ตอนนี้ `handleLeaves:135-148` กรอง `mgr→DC|MA hr→DC` แล้ว `sort:151` ให้ Action ขึ้นก่อน `updated_at desc` จึงไม่บังครับ Phase B ที่วาดไว้คือสร้าง `notifications(id, recipient_id, leave_id, type, is_read)` + `GET /api/notifications?unread` + Realtime แทน `poll 15s` ที่ `interval(15000):54` แต่ hook `fetchNotifications:74` เตรียมเสียบไว้แล้วครับ"
+*   **Answer EN:** "Split into Visibility (`own/dept/all`) and Actionability (`isActionRequired` per role). Bell now filters `mgr→DC|MA hr→DC` and sorts actions first, showing `FYI` as grey read rows. Phase B will move to a `notifications` table with Realtime, hooked at `fetchNotifications`."
+*   **ไฟล์:บรรทัด:** `leave.service.js:47`, `notification-bell.ts:99`, `notification-bell.ts:124-158`, `notification-bell.ts:74`
+*   **กับดักห้ามพูด:** "emp เห็นของ emp พอ" / "Bell โชว์ทั้งหมดแล้วให้ user กรองเอง" / "poll 15s พอแล้ว"
+*   **วิธีแก้ตรงไปตรงมา:** คง `isActionRequired:99` + `handleLeaves:135` กรอง `DC/MA` + `sort Action ก่อน` + Phase B `notifications table + supabase realtime` แทน poll
+
+---
+
+### Q66: แล้วถ้า mgr ลาเองล่ะ ใครอนุมัติ? [Self-approve กันยังไง]
+
+*   **โค้ด:** `leave-api/src/routes/leave.route.js:40` `roleMiddleware('emp')` block mgr ยื่น + `approval.route.js:25` `roleMiddleware('mgr')` approve + `leave.service.js:80 approve()` + `leave.model.ts:5 role 'emp|mgr|hr'`
+*   **คำถามไทย:** "หัวหน้าจะลาบ้าง กดอนุมัติตัวเองได้ไหมครับ?"
+*   **คำตอบไทยละเอียด:** "ตอนนี้ไม่ได้ครับ `leave.route.js:40` `POST /api/leave roleMiddleware('emp')` บล็อค `mgr/hr` ยื่นตั้งแต่ต้น — เป็น bug เชิง requirement ครับ Senior จะแก้เป็น `roleMiddleware('emp','mgr','hr')` ให้ทุกคนยื่นได้ แต่เพิ่ม guard `self-approve` ที่ `approval.route.js:25` และ `leave.service.js:80` `if(leave.user_id===req.user.id) return 403 ห้ามอนุมัติใบตัวเอง` แล้ว routing ให้ `mgr` ที่ลา → ส่งไป `mgr` อีกคนใน `department` เดียวกัน fallback ไป `hr` ครับ บันทึก `leave_status_history.action_role:46` ไว้ audit ด้วยว่าใครอนุมัติในฐานะอะไรครับ ตอนนี้คง `block` ไว้ก่อนเพื่อไม่ให้ Demo พัง — ตอบปากเปล่าพอครับ"
+*   **Answer EN:** "Currently `mgr` cannot create leaves at all (`roleMiddleware('emp')`). Fix: allow all roles to create, add `self-approve` guard `if(user_id===req.user.id) 403` at `approve`, and route `mgr` leaves to another `mgr` in same dept or `hr`."
+*   **ไฟล์:บรรทัด:** `leave.route.js:40`, `approval.route.js:25`, `leave.service.js:80`, `schema.sql:46`
+*   **กับดักห้ามพูด:** "mgr อนุมัติตัวเองได้" / "mgr ยื่นลาไม่ได้ถูกต้องแล้ว" / "ไม่ต้องกัน self-approve"
+*   **วิธีแก้ตรงไปตรงมา:** `leave.route.js:40` เปลี่ยนเป็น `roleMiddleware('emp','mgr','hr')` + `leave.service.js:80` เพิ่ม `if(leave.user_id===userId) return {error:'ห้ามอนุมัติใบตัวเอง'}` + `getLeaves` หา `mgr` คนอื่นใน dept
+
+---
+
+### Q67: ทำไมไม่ให้ mgr เห็นทั้งหมด? [Noise vs Least Privilege]
+
+*   **โค้ด:** `notification-bell.ts:135-148` กรอง `mgr DC|MA` + `supabase-store.js:184 ORDER BY updated_at` + `dashboard.component.ts:51` title ตาม role
+*   **คำถามไทย:** "ให้หัวหน้าเห็นใบลาทั้งหมดไปเลยไม่ดีเหรอครับ?"
+*   **คำตอบไทยละเอียด:** "2 เหตุผลครับ 1) Noise — ถ้า `mgr` เห็น `AP/SB/RJ` ทั้งหมด 100 ใบ `slice(0,10):158` จะบังใบ `MA` ที่ต้องทำจริง 2) Least Privilege — Bell มีไว้เตือน **ต้องทำ** ไม่ใช่ archive ครับ ใบจบแล้วให้ดูที่ `Dashboard DxDataGrid` หรือ `History /my-leaves/history` ที่ `dashboard.ts:51` แยกอยู่แล้วครับ ตอนนี้ `handleLeaves:139` กรอง `mgr→DC|MA` เท่านั้น `AP` หายจาก Bell ไปเลย ไม่รกครับ ถ้า `mgr` อยากดู history จริงให้เพิ่ม tab `ประวัติแผนก` แยก ไม่ปนใน Bell ครับ"
+*   **Answer EN:** "Showing all burdens `mgr` — `AP` rows would fill the `slice(10)` and hide `MA` actions. Bell is for actions only (`DC|MA`); completed leaves belong in Dashboard/History. Principle of least privilege + noise reduction."
+*   **ไฟล์:บรรทัด:** `notification-bell.ts:135-148`, `notification-bell.ts:158`, `dashboard.component.ts:51`
+*   **กับดักห้ามพูด:** "mgr ควรเห็นทั้งหมด" / "Bell ควรเป็น archive" / "filter ไม่จำเป็น"
+*   **วิธีแก้ตรงไปตรงมา:** คง `handleLeaves:139` `mgr→DC|MA` + `hr→DC` + `emp→own` ไว้, เพิ่ม `History แยก tab` ถ้าอยากดูทั้งหมด
+
+---
+
+### Q68: localStorage `notif_read_ids` มีปัญหาอะไร? [Key ชน + ไม่ sync]
+
+*   **โค้ด:** `notification-bell.ts:34 READ_IDS_KEY_PREFIX` + `46 getStorageKey()` + `79 loadReadIds` + `91 saveReadIds` + `95 getReadKey id:status`
+*   **คำถามไทย:** "เก็บ `isRead` ใน `localStorage` พอไหมครับ? สลับ user บนเครื่องเดียวจะเป็นไง?"
+*   **คำตอบไทยละเอียด:** "3 ปัญหาครับ 1) ล้าง browser badge เด้งใหม่หมด 2) Key `notif_read_ids:34` เดิมไม่มี prefix `userId` สลับ `emp01→mgr01` บนเครื่องเดียวอ่านร่วมกัน เห็น badge ของกันและกัน 3) ไม่ cross-device มือถือกับคอมไม่ sync ครับ P1 แก้แล้ว `getStorageKey:46 return notif_read_ids:${user.id}` + `loadReadIds:79 clear + load per user + migrate legacy` + `saveReadIds:91 setItem(getStorageKey())` ทำให้ `emp01` กับ `mgr01` คนละ key กันครับ `getReadKey:95 id:status` ยังแยก `DC→MA` เปลี่ยนแล้วถือว่า unread ใหม่ (ถ้าใช้ `id` อย่างเดียวจะถือว่าอ่านค้าง) Phase B ย้ายไป `notifications.is_read` ใน DB + `PATCH /api/notifications/:id/read` + Realtime จะ sync ทุกเครื่องครับ"
+*   **Answer EN:** "Plain `localStorage notif_read_ids` is per-browser, deleted on clear, shared across users on same machine, and not cross-device. Fix: `getStorageKey()` prefixes with `userId` (`notif_read_ids:${id}`), clears on user switch, and Phase B moves `is_read` to DB with `PATCH /read` + Realtime."
+*   **ไฟล์:บรรทัด:** `notification-bell.ts:34`, `notification-bell.ts:46`, `notification-bell.ts:79-92`, `notification-bell.ts:95`
+*   **กับดักห้ามพูด:** "`localStorage` พอแล้ว" / "key เดียวใช้ร่วมกันได้" / "ไม่ต้อง sync ข้ามเครื่อง"
+*   **วิธีแก้ตรงไปตรงมา:** คง `READ_IDS_KEY_PREFIX + getStorageKey:46` + `loadReadIds clear+migrate` + Phase B `notifications table is_read + supabase realtime` + `fetchNotifications:74` สลับเป็น `notificationService.getUnread()`
+
+---
+
+> **สรุป Q65-Q68 (Bell Senior 29 ส.ค.):** `Q65` แยก Visibility vs Actionability `Q66` กัน self-approve `mgr` ลาเอง `Q67` `mgr/hr` เห็นแค่ `DC/MA` ลด noise `Q68` `localStorage prefix userId` + Phase B DB — ตอบกรรมการว่า "Bell มีไว้เตือนต้องทำ ไม่ใช่ archive" ครับ
+
+**ยืนยัน Bell 29 ส.ค. 2026:** `notification-bell.ts:34,46,79,91,95,99,124,151,171` `leave.service.js:47` `leave.route.js:40` `approval.route.js:25` `store.js:39` | **Build:** `ng build ✔ 16s` | **P2 next:** `notifications table + Realtime + GET /api/notifications?unread`
+
+---
+
+## ส่วนที่ 10: P1.6 Bugfix Q69 — Resubmit แนบหลายไฟล์แล้วพัง + ไทยเพี้ยน (29 ส.ค. 2026)
+
+> บั๊กจริงจาก Prod `leave/1861a9a.../edit` — HR ส่งกลับ `SU+Y` แล้ว emp แนบ `resume.pdf` ซ้ำ 4 ไฟล์ไม่ลบของเดิม → `POST /resubmit 400 คำขอนี้ไม่ได้ถูกส่งกลับแก้ไข` + HR ยังเห็น `ตรวจสอบเอกสาร` ค้าง
+
+### Q69: แนบหลายไฟล์ตอนส่งกลับ ทำไม `resubmit` พัง + ชื่อไทย `à¹..` เพี้ยน?
+
+*   **โค้ด:** `leave.service.js:159` `if(flag!=='Y') return error`, `file.route.js:115` `auto SU->DC flag='N'`, `upload-zone.component.ts:98` `remaining = maxFiles - pending.length`, `file.service.js:57` `original_name: file.originalname`, `leave-form.component.ts:223` `resubmit() → uploadAll()` 2 request
+*   **คำถามไทย:** "พี่ถูกส่งกลับแล้วแนบ 4 ไฟล์กด `ส่งคำขออีกครั้ง` ทำไมขึ้น `ไม่ได้ถูกส่งกลับ` แล้วชื่อไทยเพี้ยน `resume à¸..pdf` ครับ?"
+*   **คำตอบไทยสั้น (ท่อง 45 วิ):**
+    *   **ทำไมพัง — 2 request ไม่ atomic:** `leave-form.ts:223` เดิม `POST /resubmit (JSON)` ล้าง `SU,Y → DC,N` ที่ `leave.service.js:174` **ก่อน** แล้วค่อย `POST /files` — ถ้าไฟล์พัง (เกิน 5/ชื่อซ้ำ/type ผิด) `DC,N` ไปแล้ว กดซ้ำเจอ `flag!=='Y' 400` ถาวร ต้องให้ HR ส่งกลับใหม่
+    *   **ทำไมแนบเกิน + ซ้ำ:** `upload-zone.ts:98` นับ `remaining = 5 - pending.length` ไม่นับ `existingFileList` — มีเก่า 1 + เลือกใหม่ 4 ได้ `pending=4` รวม 5 แต่ backend `multer files:5` กันแค่ต่อ request ไม่กันรวม → สะสมเกินได้ + `file.service.js` ไม่เช็คชื่อซ้ำเลย `resume.pdf` 4 ไฟล์ได้ 4 row
+    *   **ทำไมไทยเพี้ยน:** `file.service.js:57` `original_name: file.originalname` ตรงๆ — `multer` ส่ง `latin1` มาเป็น `à¹ƒà¸š` ต้อง `Buffer.from(name,'latin1').toString('utf8')` ถึงได้ไทย
+    *   **แก้ 3 จุด:** 1) **Atomic:** `leave.route.js:55` `resubmit` รับ `multipart` เดียว `upload.array('files',5)` → save ไฟล์ **ก่อน** `resubmit` ถ้าพังไม่ล้าง flag + `leave.service.ts:26` ส่ง `FormData` (`leave_type/start/end/reason + files`) ทีเดียว 2) **Frontend:** `upload-zone.ts:98` `remaining = 5 - (pending+existing)` + กันชื่อซ้ำ `pending/existing` + `file.route.js:75` กันรวมเกิน 5 + กันชื่อซ้ำฝั่ง BE 3) **Encoding:** `file.service.js:14 decodeFilename()` `Buffer latin1→utf8`
+*   **Answer EN:** "Two requests (`resubmit` clears `SU,Y→DC,N` before `upload`) makes retry impossible if upload fails. Frontend counted only `pending`, allowed duplicates and overflow; backend had no total check. Thai names were `latin1` not decoded. Fix: single `multipart resubmit` (save before transition), `remaining = max - (pending+existing)` + dedupe, `500` total check, and `latin1→utf8` decode."
+*   **ไฟล์:บรรทัด:** `leave-form.component.ts:223-251` `leave.service.ts:26` `leave.route.js:55-120` `leave.service.js:159,174` `upload-zone.component.ts:97-118` `file.route.js:75-110` `file.service.js:14,36`
+*   **กับดักห้ามพูด:** "`resubmit` แยก 2 request ปกติ" / "นับแค่ pending พอ" / "ชื่อซ้ำไม่เป็นไร" / "ไทยเพี้ยนเพราะ DB"
+*   **วิธีแก้ตรงไปตรงมา:** คง `resubmit FormData atomic` + `remaining = max-(pending+existing)` + `file.route 400 เกิน 5/ซ้ำ` + `decodeFilename latin1→utf8` — P2 ทำ `MAX_FILES constant` + `transaction`
+
+> **สรุป Q69 (Resubmit):** `Atomic multipart` กัน flag ล้างก่อนไฟล์ + `นับรวม existing` กันเกิน 5 + `กันชื่อซ้ำ` + `decode ไทย` — จาก `400 ไม่ได้ถูกส่งกลับ` แก้เป็นส่งทีเดียวจบ HR เห็น `DC` ถูกต้อง
+
+**ยืนยัน Q69 29 ส.ค. 2026:** `leave.route.js:55` `leave.service.ts:26` `upload-zone.ts:98` `file.route.js:75` `file.service.js:14` `leave-form.ts:223` | **P2 next:** `MAX_FILES constant` + `rpc transaction`
+
