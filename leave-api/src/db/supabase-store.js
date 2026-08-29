@@ -187,21 +187,20 @@ class SupabaseStore {
   }
 
   async updateLeave(id, fields) {
-    // เติม updated_at ทุกครั้ง — ให้ Bell/Dashboard เรียงตามเวลาล่าสุดถูก
-    const fieldsWithTs = { ...fields, updated_at: new Date().toISOString() };
+    fields.updated_at = new Date().toISOString();
     // HOTFIX: รองรับ SU<->F drift เหมือน createLeave — ถ้า update เป็น SU แล้วโดน check constraint ให้ลอง F
     const tryUpdate = async (f) => {
       const { data: leave, error } = await this.supabase.from('leave_requests').update(f).eq('id', id).select().single();
       return { leave, error };
     };
-    let { leave, error } = await tryUpdate(fieldsWithTs);
+    let { leave, error } = await tryUpdate(fields);
     if (!error) return leave && leave.current_status === 'F' ? { ...leave, current_status: 'SU' } : leave;
     const isCheckViolation = error.code === '23514' && String(error.message).includes('current_status');
     if (isCheckViolation && fields.current_status) {
       const alt = fields.current_status === 'SU' ? 'F' : fields.current_status === 'F' ? 'SU' : null;
       if (alt) {
         console.warn(`[DB] updateLeave ${fields.current_status} rejected -> retry ${alt}`, id);
-        const retryFields = { ...fieldsWithTs, current_status: alt };
+        const retryFields = { ...fields, current_status: alt };
         const r2 = await tryUpdate(retryFields);
         if (!r2.error) return r2.leave && r2.leave.current_status === 'F' ? { ...r2.leave, current_status: 'SU' } : r2.leave;
       }
