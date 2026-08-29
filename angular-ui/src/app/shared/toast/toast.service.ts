@@ -53,10 +53,8 @@ export class ToastService {
       hiding: false,
     };
     this.toasts.push(toast);
-    while (this.toasts.length > 5) {
-      const removed = this.toasts.shift()!;
-      if (removed.hiding) continue;
-      removed.hiding = true;
+    if (this.toasts.length > 5) {
+      this.toasts = this.toasts.slice(-5);
     }
     this.emit();
     setTimeout(() => this.dismiss(toast.id), 4000);

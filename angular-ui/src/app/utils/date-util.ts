@@ -26,5 +26,5 @@ export function formatThaiDateRange(start: string, end: string): string {
 }
 
 export function isSameDay(a: string, b: string): boolean {
-  return new Date(a).getTime() === new Date(b).getTime();
+  return a.slice(0, 10) === b.slice(0, 10);
 }
