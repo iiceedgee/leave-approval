@@ -22,31 +22,39 @@ module.exports = function (leaveService) {
   }
 
   // POST /api/approval/:id/approve — อนุมัติ (หัวหน้าคนเดียว)
-  router.post('/:id/approve', validateId, roleMiddleware('mgr'), async (req, res) => {
-    const id = req.params.id;
-    const leave = await leaveService.approve(id, req.user.id, req.user.role, req.body.remark);
-    handleResult(leave, res);
+  router.post('/:id/approve', validateId, roleMiddleware('mgr'), async (req, res, next) => {
+    try {
+      const id = req.params.id;
+      const leave = await leaveService.approve(id, req.user.id, req.user.role, req.body.remark);
+      handleResult(leave, res);
+    } catch (err) { next(err); }
   });
 
   // POST /api/approval/:id/sendback — ส่งกลับแก้ไข (stamp B)
-  router.post('/:id/sendback', validateId, async (req, res) => {
-    const id = req.params.id;
-    const leave = await leaveService.sendBack(id, req.user.id, req.user.role, req.body.remark);
-    handleResult(leave, res);
+  router.post('/:id/sendback', validateId, async (req, res, next) => {
+    try {
+      const id = req.params.id;
+      const leave = await leaveService.sendBack(id, req.user.id, req.user.role, req.body.remark);
+      handleResult(leave, res);
+    } catch (err) { next(err); }
   });
 
   // POST /api/approval/:id/reject — ไม่อนุมัติ (stamp U)
-  router.post('/:id/reject', validateId, async (req, res) => {
-    const id = req.params.id;
-    const leave = await leaveService.reject(id, req.user.id, req.user.role, req.body.remark);
-    handleResult(leave, res);
+  router.post('/:id/reject', validateId, async (req, res, next) => {
+    try {
+      const id = req.params.id;
+      const leave = await leaveService.reject(id, req.user.id, req.user.role, req.body.remark);
+      handleResult(leave, res);
+    } catch (err) { next(err); }
   });
 
   // POST /api/approval/:id/cancel — ยกเลิก (stamp C)
-  router.post('/:id/cancel', validateId, async (req, res) => {
-    const id = req.params.id;
-    const leave = await leaveService.cancel(id, req.user.id, req.user.role, req.body.remark);
-    handleResult(leave, res);
+  router.post('/:id/cancel', validateId, async (req, res, next) => {
+    try {
+      const id = req.params.id;
+      const leave = await leaveService.cancel(id, req.user.id, req.user.role, req.body.remark);
+      handleResult(leave, res);
+    } catch (err) { next(err); }
   });
 
   return router;
