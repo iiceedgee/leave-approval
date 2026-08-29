@@ -4,6 +4,17 @@ const { v4: uuidv4 } = require('uuid');
 const { UPLOAD_PATH } = require('../middleware/upload.middleware');
 const supabase = require('../db/supabase');
 
+function decodeFilename(name) {
+  if (!name) return name;
+  try {
+    // multer ส่ง originalname แบบ latin1 ทำให้ไทยเพี้ยนเป็น à¹.. ต้อง decode -> utf8
+    const decoded = Buffer.from(name, 'latin1').toString('utf8');
+    // ถ้า decode แล้วได้ไทยจริง ใช้ decoded, ไม่งั้น fallback ชื่อเดิม
+    if (decoded && !decoded.includes('�')) return decoded;
+    return name;
+  } catch { return name; }
+}
+
 class FileService {
   constructor(db) {
     // ⚠️ เดิม: constructor(store) — ใช้ array ในเครื่อง
@@ -31,10 +42,11 @@ class FileService {
 
     const isVercel = !!process.env.VERCEL;
 
+    const originalName = decodeFilename(file.originalname);
     // ถ้าเป็น Vercel + มี buffer (memoryStorage) ให้อัปโหลดเข้า Supabase Storage
     // defensive: ถ้า supabase client เป็น null (local in-memory fallback) ให้ fallback ไป disk logic
     if (isVercel && file.buffer && supabase) {
-      const ext = path.extname(file.originalname || '');
+      const ext = path.extname(originalName || '');
       // multer.memoryStorage ไม่มี filename — ต้อง gen เอง
       const filename = file.filename || `${uuidv4()}${ext}`;
       const supabasePath = path.posix.join(String(leaveId), filename);
@@ -54,7 +66,7 @@ class FileService {
       return this.db.createDocument({
         leave_request_id: leaveId,
         file_name: filename,
-        original_name: file.originalname,
+        original_name: originalName,
         mime_type: file.mimetype,
         file_size: file.size || file.buffer.length,
         file_path: supabasePath, // เก็บเป็น supabase storage path (ไม่ใช่ local path)
@@ -66,12 +78,12 @@ class FileService {
     // Fallback / Local: ใช้ logic เดิม (diskStorage มี filename และ path บน disk)
     // กรณี Vercel แต่ไม่มี supabase หรือไม่มี buffer ก็ fallback มาด้านนี้เพื่อไม่ให้ flow พัง
     if (isVercel && file.buffer && !supabase) {
-      const ext = path.extname(file.originalname || '');
+      const ext = path.extname(originalName || '');
       const filename = file.filename || `${uuidv4()}${ext}`;
       return this.db.createDocument({
         leave_request_id: leaveId,
         file_name: filename,
-        original_name: file.originalname,
+        original_name: originalName,
         mime_type: file.mimetype,
         file_size: file.size || file.buffer.length,
         file_path: path.join(String(leaveId), filename),
@@ -83,12 +95,12 @@ class FileService {
     // Non-Vercel (local) — file มาจาก diskStorage มี file.filename แน่นอน
     if (!file.filename) {
       // Defensive: if somehow we got buffer without supabase on local, generate filename
-      const ext = path.extname(file.originalname || '');
+      const ext = path.extname(originalName || '');
       const filename = `${uuidv4()}${ext}`;
       return this.db.createDocument({
         leave_request_id: leaveId,
         file_name: filename,
-        original_name: file.originalname,
+        original_name: originalName,
         mime_type: file.mimetype,
         file_size: file.size || file.buffer?.length || 0,
         file_path: path.join(String(leaveId), filename),
@@ -99,7 +111,7 @@ class FileService {
     return this.db.createDocument({
       leave_request_id: leaveId,
       file_name: file.filename,
-      original_name: file.originalname,
+      original_name: originalName,
       mime_type: file.mimetype,
       file_size: file.size,
       file_path: path.join(String(leaveId), file.filename),
