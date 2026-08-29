@@ -8,11 +8,8 @@ export class JwtInterceptor implements HttpInterceptor {
   constructor(private auth: AuthService) {}
 
   intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
-    // ไม่ส่ง JWT ไป endpoint สาธารณะ — กัน 401 รกตอน login/register
-    const skipAuth = ['/auth/login', '/auth/register'];
-    if (skipAuth.some(u => req.url.includes(u))) {
-      return next.handle(req);
-    }
+    const skip = ['/auth/login', '/auth/register'];
+    if (skip.some(u => req.url.includes(u))) return next.handle(req);
     const token = this.auth.getToken();
     if (token) {
       req = req.clone({ setHeaders: { Authorization: `Bearer ${token}` } });
