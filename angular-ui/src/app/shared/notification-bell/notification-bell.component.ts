@@ -31,7 +31,7 @@ export class NotificationBellComponent implements OnInit, OnDestroy {
 
   private destroy$ = new Subject<void>();
   private readIds = new Set<string>();
-  private readonly READ_IDS_KEY = 'notif_read_ids';
+  private readonly READ_IDS_KEY_PREFIX = 'notif_read_ids';
   // Phase A: role-based — hook for Phase B notificationService
   // Phase B will replace getLeaves() with notificationService.getUnread()
   private readonly NEED_CHECK = new Set<string>(['DC', 'MA']); // fallback for isRead generic
@@ -42,6 +42,11 @@ export class NotificationBellComponent implements OnInit, OnDestroy {
     private leaveService: LeaveService,
     private router: Router
   ) {}
+
+  private getStorageKey(): string {
+    const user = this.auth.getUser();
+    return user ? `${this.READ_IDS_KEY_PREFIX}:${user.id}` : this.READ_IDS_KEY_PREFIX;
+  }
 
   ngOnInit(): void {
     this.loadReadIds();
@@ -73,20 +78,31 @@ export class NotificationBellComponent implements OnInit, OnDestroy {
 
   private loadReadIds(): void {
     try {
-      const raw = localStorage.getItem(this.READ_IDS_KEY);
+      const key = this.getStorageKey();
+      const raw = localStorage.getItem(key);
+      // clear stale ids from previous user before load (กัน key ชน)
+      this.readIds.clear();
       if (raw) JSON.parse(raw).forEach((k: string) => this.readIds.add(k));
+      // migrate legacy key (no user prefix) once
+      const legacy = localStorage.getItem(this.READ_IDS_KEY_PREFIX);
+      if (legacy && this.readIds.size === 0) {
+        JSON.parse(legacy).forEach((k: string) => this.readIds.add(k));
+        // save migrated to new key then remove legacy to avoid reuse
+        try { localStorage.setItem(key, JSON.stringify([...this.readIds])); } catch {}
+      }
     } catch {}
   }
 
   private saveReadIds(): void {
-    try { localStorage.setItem(this.READ_IDS_KEY, JSON.stringify([...this.readIds])); } catch {}
+    try { localStorage.setItem(this.getStorageKey(), JSON.stringify([...this.readIds])); } catch {}
   }
 
   private getReadKey(id: string, status: string): string {
     return `${id}:${status}`;
   }
 
-  private isNeedsCheck(leave: Leave, role: string): boolean {
+  /** Senior แยก 2 แกน: Visibility (ใครเห็น) vs Actionability (ใครต้องทำ) */
+  private isActionRequired(leave: Leave, role: string): boolean {
     const status = String(leave.current_status);
     if (role === 'emp') {
       // emp ต้องทำเมื่อถูกส่งกลับ (SU + flag Y) — SB history but current is SU+Y
@@ -99,6 +115,10 @@ export class NotificationBellComponent implements OnInit, OnDestroy {
       return status === 'DC';
     }
     return this.NEED_CHECK.has(status);
+  }
+
+  private isNeedsCheck(leave: Leave, role: string): boolean {
+    return this.isActionRequired(leave, role);
   }
 
   ngOnDestroy(): void {
@@ -114,15 +134,29 @@ export class NotificationBellComponent implements OnInit, OnDestroy {
       return;
     }
 
+    // reload per-user readIds when user changes (กัน key ชน)
+    this.loadReadIds();
+
     let filtered = leaves;
     if (user.role === 'emp') {
+      // emp: เห็นของตัวเองเท่านั้น — badge แดงเฉพาะ SB(Y), ที่เหลือ FYI เทา
       filtered = leaves.filter(l => String(l.user_id) === String(user.id));
     } else if (user.role === 'mgr') {
-      filtered = leaves;
+      // mgr: เห็นเฉพาะแผนกที่ต้องทำ (DC/MA) — ใบ AP/SB/RJ จบแล้วไม่เข้า Bell (ดูที่ Dashboard)
+      filtered = leaves.filter(l => {
+        const s = String(l.current_status);
+        return s === 'DC' || s === 'MA';
+      });
+    } else if (user.role === 'hr') {
+      // hr: เห็นทั้งหมดแต่ Bell โชว์เฉพาะ DC ที่ต้องตรวจเอกสาร
+      filtered = leaves.filter(l => String(l.current_status) === 'DC');
     }
 
-    // Phase A fix: sort by updated_at desc + limit 10 (prevent 1000 rows bloat)
+    // Phase A fix: Action ขึ้นก่อน แล้วค่อย updated_at desc + limit 10 (กัน 1000 rows บวม + กันบังใบต้องทำ)
     const sorted = [...filtered].sort((a, b) => {
+      const aAction = this.isActionRequired(a, user.role) ? 0 : 1;
+      const bAction = this.isActionRequired(b, user.role) ? 0 : 1;
+      if (aAction !== bAction) return aAction - bAction;
       const ta = new Date((a as any).updated_at || (a as any).created_at).getTime();
       const tb = new Date((b as any).updated_at || (b as any).created_at).getTime();
       return tb - ta;
