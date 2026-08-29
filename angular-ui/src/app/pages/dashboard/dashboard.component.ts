@@ -55,9 +55,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
     return 'คำขอลาทั้งหมด';
   }
 
-  isOwner(leave: any): boolean {
+  isOwner(leave: Pick<Leave, 'user_id'> | null | undefined): boolean {
     if (!leave || !this.user?.id) return false;
-    return String(leave.user_id) === String(this.user.id);
+    return String((leave as any).user_id) === String(this.user.id);
   }
 
   logout(): void {

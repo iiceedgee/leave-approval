@@ -49,13 +49,16 @@
     <dxi-column dataField="current_status" caption="สถานะ" cellTemplate="statusTemplate" alignment="center">
       <div *dxTemplate="let data of 'statusTemplate'">
         <app-status-badge [statusCode]="data.data.current_status"></app-status-badge>
+        <span *ngIf="data.data.flag_send_back === 'Y'" class="sendback-badge" role="status" aria-label="ถูกส่งกลับ กรุณาแก้ไขแล้วส่งใหม่" title="ถูกส่งกลับ กรุณาแก้ไขแล้วส่งใหม่"><span aria-hidden="true">🔄</span> ส่งกลับแก้ไข</span>
       </div>
     </dxi-column>
 
     <dxi-column caption="Actions" cellTemplate="actionsTemplate" alignment="center">
       <div *dxTemplate="let data of 'actionsTemplate'">
-        <a class="btn-sm" [routerLink]="'/leave/' + data.data.id">ดูรายละเอียด</a>
-        <span class="tag" *ngIf="data.data.flag_send_back === 'Y'">🔄 ส่งกลับ</span>
+        <div class="actions-cell">
+          <a class="btn-sm" [routerLink]="'/leave/' + data.data.id">ดูรายละเอียด</a>
+          <a *ngIf="data.data.flag_send_back === 'Y' && ''+data.data.user_id === ''+user?.id" class="btn-sm btn-resubmit" [routerLink]="'/leave/' + data.data.id + '/edit'" [attr.aria-label]="'แก้ไขคำขอ ' + (data.data.request_no || data.data.id)">แก้ไข</a>
+        </div>
       </div>
     </dxi-column>
   </dx-data-grid>
