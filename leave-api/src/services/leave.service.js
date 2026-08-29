@@ -161,11 +161,23 @@ class LeaveService {
     if (leave.flag_send_back !== 'Y') return { error: 'คำขอนี้ไม่ได้ถูกส่งกลับแก้ไข' };
     if (leave.current_status !== STATUS.SU.code) return { error: 'สถานะปัจจุบันไม่ใช่รอแก้ไข (SU)' };
 
+    // validate fields — same rules as create (reuse leave-quota keys)
+    if (data.leave_type !== undefined) {
+      const allowed = Object.keys(leaveQuota);
+      if (!data.leave_type || !allowed.includes(String(data.leave_type).trim())) throw Object.assign(new Error(`leave_type ต้องเป็น ${allowed.join(', ')}`), { statusCode: 400 });
+    }
+    if (data.start_date !== undefined && isNaN(Date.parse(data.start_date))) throw Object.assign(new Error('รูปแบบวันที่ไม่ถูกต้อง (YYYY-MM-DD)'), { statusCode: 400 });
+    if (data.end_date !== undefined && isNaN(Date.parse(data.end_date))) throw Object.assign(new Error('รูปแบบวันที่ไม่ถูกต้อง (YYYY-MM-DD)'), { statusCode: 400 });
+    const effStart = data.start_date || leave.start_date;
+    const effEnd = data.end_date || leave.end_date;
+    if (effStart && effEnd && new Date(effEnd) < new Date(effStart)) throw Object.assign(new Error('วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่ม'), { statusCode: 400 });
+    if (data.reason !== undefined && (!data.reason || String(data.reason).trim().length < 5)) throw Object.assign(new Error('เหตุผลต้องมีอย่างน้อย 5 ตัวอักษร'), { statusCode: 400 });
+
     const updateFields = { current_status: STATUS.DC.code, flag_send_back: 'N' };
-    if (data.leave_type) updateFields.leave_type = data.leave_type;
+    if (data.leave_type) updateFields.leave_type = String(data.leave_type).trim();
     if (data.start_date) updateFields.start_date = data.start_date;
     if (data.end_date) updateFields.end_date = data.end_date;
-    if (data.reason) updateFields.reason = data.reason;
+    if (data.reason) updateFields.reason = String(data.reason).trim();
 
     const updated = await this.db.updateLeave(leaveId, updateFields);
 
