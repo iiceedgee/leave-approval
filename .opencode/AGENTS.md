@@ -166,4 +166,10 @@ When the user asks to build/create/implement/fix/add anything:
 - UI popups must use the Gen-Z trendy custom toast style described above — do not swap back to plain Material defaults.
 - Status machine codes and role chain (`emp → mgr → hr`) are fixed business rules; do not redesign them.
 - Commit ต้องภาษาไทย 1 เรื่องต่อ 1 commit — ดูเป็นคนเขียน ไม่ใช่บอท (กฎ 1-7)
+### Commit Rules — 1 fix = 1 commit (SourceTree)
+- 1 เรื่อง ต่อ 1 commit เท่านั้น — ห้ามรวมหลายเรื่องใน commit เดียว
+- ข้อความ commit ภาษาไทย สไตล์คนเขียน: `prefix(ขอบเขต): คำไทยสั้นๆ` + body `ไฟล์:บรรทัด`
+- ตัวอย่าง: `fix(auth): กัน JWT ยิงไปหน้า login — ลด 401 รก`
+- ทุก commit ต้องผ่าน 360° Checklist + build ก่อน push
+- ใช้ subagent Workflow เดิม `@senior-dev` ทำ → `@reviewer` ตรวจ → ค่อย commit
 <!-- END USER-SPECIFIED -->
