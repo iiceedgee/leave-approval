@@ -41,12 +41,13 @@
 
   <!-- Plan A: HR/MGR เห็นข้อความรอแก้ไขที่ SU แทนหน้าว่าง -->
   <div class="action-panel" *ngIf="shouldShowWaitingForHr">
-    <h4>รอการแก้ไขการยื่นคำขอจากพนักงาน</h4>
-    <p>คำขอถูกส่งกลับแก้ไข — รอพนักงานแก้ไขและแนบเอกสารใหม่</p>
+    <h4>รอพนักงานดำเนินการ (SU)</h4>
+    <p>คำขออยู่ระหว่าง “ยื่นคำขอ” — รอพนักงานแนบเอกสาร/แก้ไขหลังถูกส่งกลับ เจ้าหน้าที่ไม่ต้องดำเนินการ</p>
   </div>
 
   <div class="action-panel" *ngIf="canDoPretemp">
     <h4>ตรวจสอบเอกสาร (ความครบถ้วน)</h4>
+    <p class="panel-hint">เอกสารครบ → กด “เอกสารครบถ้วน” ส่งต่อหัวหน้าอนุมัติทันที · ส่งกลับ/ไม่อนุมัติ ต้องระบุเหตุผล</p>
     <app-upload-zone
       [leaveId]="leave.id"
       [uploadFn]="onVerificationUpload.bind(this)"
@@ -57,8 +58,9 @@
       class="remark-input"
       rows="2"
       [(ngModel)]="pretempRemark"
-      placeholder="หมายเหตุ"
+      placeholder="หมายเหตุ (จำเป็นเมื่อส่งกลับ/ไม่อนุมัติ)"
     ></textarea>
+    <span class="field-hint" *ngIf="isPretempSendDisabled && !loading">* ระบุเหตุผลเพื่อเปิดปุ่ม ส่งกลับ/ไม่อนุมัติ</span>
     <div class="action-btns">
       <button
         class="btn btn-approve"
@@ -86,7 +88,8 @@
   </div>
 
   <div class="action-panel" *ngIf="showApprovalPanel">
-    <h4>อนุมัติคำขอ</h4>
+    <h4>หัวหน้าอนุมัติ (MA) — อนุมัติ / ส่งกลับ / ไม่อนุมัติ</h4>
+    <p class="panel-hint">เฉพาะหัวหน้า (mgr) ที่แผนกเดียวกัน · HR ดูได้อย่างเดียว</p>
     <textarea
       class="remark-input"
       rows="2"
