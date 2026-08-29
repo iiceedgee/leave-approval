@@ -867,3 +867,20 @@ hr       | all  + DC เท่านั้น       | DC แดง              
 
 **ยืนยัน Q69 29 ส.ค. 2026:** `leave.route.js:55` `leave.service.ts:26` `upload-zone.ts:98` `file.route.js:75` `file.service.js:14` `leave-form.ts:223` | **P2 next:** `MAX_FILES constant` + `rpc transaction`
 
+---
+
+### Q70: กดส่ง 2 tab พร้อมกัน ทำไม tab หลังพัง? (B - กันชนแบบไม่ต้อง RPC)
+
+**ถาม:** พี่เปิด 2 tab กด "ส่งคำขออีกครั้ง" พร้อมกัน ทำไม tab หลังขึ้น "ไม่ได้ถูกส่งกลับแก้ไข" ครับ?
+
+**ตอบ:**
+• **ทำไมพัง:** เดิม `getLeave → if(flag!=='Y') → UPDATE` แยก 2 ขั้น — 2 tab อ่าน `SU,Y` ได้ทั้งคู่ ผ่าน Gate ทั้งคู่ แล้วแย่งกัน `UPDATE DC,N` คนหลังเลย `400`
+• **แก้ B ไม่ต้อง RPC:** `supabase-store.js:189` เปลี่ยนเป็น `UPDATE ... WHERE flag='Y' AND status='SU' RETURNING *` → ถ้าไม่ได้แถวกลับมา = โดนชิงไปแล้ว → ตอบ `409 กดไปแล้ว กำลังรีเฟรช` แทน `400` งง
+• **กันพลาดตั้งแต่ก่อนกด:** `upload-zone.ts:98` โชว์ `เหลืออีก X ไฟล์` + `input disabled เมื่อครบ 5` (นับ `pending+existing`) กันเลือกเกินตั้งแต่ต้น ไม่ต้องรอ backend ด่า
+
+**ไฟล์:** `supabase-store.js:189` `leave.service.js:174` `upload-zone.ts:98` `leave-form.ts:152`
+
+> **สรุป Q70:** `WHERE flag='Y' RETURNING` กันชน 2 tab + `disabled เมื่อครบ 5` กันเกิน — RPC ไว้ `Phase A` ค่อยทำ `FOR UPDATE`
+
+**ยืนยัน Q70 29 ส.ค. 2026 (B ยังไม่ทำ — ทำตอนลงมือ):** `supabase-store.js:189` `leave.service.js:174` `upload-zone.ts:98` | **Phase A next:** `rpc_resubmit_with_files + FOR UPDATE`
+
