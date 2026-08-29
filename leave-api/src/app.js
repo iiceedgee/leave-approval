@@ -50,6 +50,22 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '1mb' }));
 
+// P0: simple rate limiter for auth (10 req/min per IP) — กัน brute-force
+const rateLimitMap = new Map();
+app.use((req, res, next) => {
+  if (!req.path.startsWith('/api/auth')) return next();
+  const ip = req.ip || (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'local';
+  const now = Date.now();
+  const windowMs = 60 * 1000;
+  const max = 10;
+  const entry = rateLimitMap.get(ip) || { count: 0, reset: now + windowMs };
+  if (now > entry.reset) { entry.count = 0; entry.reset = now + windowMs; }
+  entry.count++;
+  rateLimitMap.set(ip, entry);
+  if (entry.count > max) return res.status(429).json({ message: 'Too many requests — ลองใหม่ใน 1 นาที' });
+  next();
+});
+
 // ★ เลือก data layer: มี Supabase จริง → ใช้ SupabaseStore, ไม่งั้นใช้ InMemory
 // เดิมบรรทัดนี้มีแค่: const db = new InMemoryStore();
 const db = supabaseClient ? new SupabaseStore(supabaseClient) : new InMemoryStore();
@@ -75,7 +91,10 @@ app.use('/api/approval', approvalRoute(leaveService));
 app.use('/api/leave', fileRoute(fileService));
 app.use('/api/approval', documentRoute(documentService));
 app.use('/api/approval', verificationFileRoute(fileService));
-app.use('/api/debug', debugRoute(supabaseClient));
+// P0: debug ปิดใน prod ถ้าไม่เปิด ENABLE_DEBUG
+if (process.env.ENABLE_DEBUG === '1' || process.env.NODE_ENV !== 'production') {
+  app.use('/api/debug', debugRoute(supabaseClient));
+}
 
 // Health check
 app.get('/api/health', async (req, res) => {
