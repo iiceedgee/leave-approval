@@ -53,6 +53,28 @@ module.exports = function (fileService) {
           return res.status(400).json({ message: 'กรุณาเลือกไฟล์อย่างน้อย 1 ไฟล์' });
         }
 
+        // กันเกิน 5 ไฟล์ + ชื่อซ้ำ (รวมไฟล์เดิม) — เหมือน file.route
+        try {
+          const existingFiles = await fileService.getFiles(leaveId);
+          const totalAfter = (existingFiles?.length || 0) + req.files.length;
+          if (totalAfter > 5) {
+            if (!process.env.VERCEL) { for (const f of req.files) { try { if (f.path) require('fs').unlinkSync(f.path); } catch {} } }
+            return res.status(400).json({ message: `อัปโหลดได้สูงสุด 5 ไฟล์ (มีอยู่แล้ว ${existingFiles.length} ไฟล์ จะเพิ่มอีก ${req.files.length} ไฟล์ รวมเป็น ${totalAfter} ไฟล์)` });
+          }
+          const existingNames = new Set((existingFiles || []).map(x => (x.original_name || '').toLowerCase()));
+          const seen = new Set();
+          for (const f of req.files) {
+            let dec = f.originalname || '';
+            try { dec = Buffer.from(dec, 'latin1').toString('utf8'); } catch {}
+            dec = dec.toLowerCase();
+            if (existingNames.has(dec) || seen.has(dec)) {
+              if (!process.env.VERCEL) { for (const x of req.files) { try { if (x.path) require('fs').unlinkSync(x.path); } catch {} } }
+              return res.status(400).json({ message: `ไฟล์ชื่อซ้ำ: ${f.originalname} มีอยู่แล้ว` });
+            }
+            seen.add(dec);
+          }
+        } catch (countErr) { console.error('[verification-file] count check', countErr.message); }
+
         // Terminal guard
         if ([STATUS.AP.code, STATUS.RJ.code, STATUS.CX.code, STATUS.MA.code].includes(leave.current_status) && false) {
           // MA is not terminal for verification but HR should not upload at MA — already blocked by DC check

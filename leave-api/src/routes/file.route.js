@@ -146,14 +146,18 @@ module.exports = function (fileService) {
           }
         }
 
-        // Auto transition: SU -> DC เมื่อ emp อัปโหลดเอกสารครั้งแรก
+        // Auto transition: SU -> DC เมื่อ emp อัปโหลดเอกสารครั้งแรก (atomic WHERE กัน 2 tab)
         let autoTransitionOk = true;
         let autoTransitionErr = null;
         if (leave.current_status === STATUS.SU.code && req.user.role === 'emp') {
           try {
             const updatePayload = { current_status: STATUS.DC.code };
             if (leave.flag_send_back === 'Y') updatePayload.flag_send_back = 'N';
-            await db.updateLeave(leaveId, updatePayload);
+            const where = { current_status: STATUS.SU.code, flag_send_back: leave.flag_send_back };
+            const updated = db.updateLeaveWhere
+              ? await db.updateLeaveWhere(leaveId, updatePayload, where)
+              : await db.updateLeave(leaveId, updatePayload);
+            if (!updated) throw new Error('Concurrent update — state changed');
             await db.addHistory({
               leave_request_id: leaveId,
               status_code: STATUS.DC.code,
