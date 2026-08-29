@@ -206,10 +206,9 @@ export class LeaveFormComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Handles the resubmit flow:
-   * 1. POST the resubmit data
-   * 2. On success, upload any new pending files
-   * 3. Keep the user on the page to see the success message (only after upload succeeds)
+   * Handles the resubmit flow (atomic):
+   * ส่งข้อมูล + ไฟล์แนบพร้อมกันใน request เดียว (Flame: multipart) กัน flag ล้างก่อนอัปโหลด
+   * เดิมแยก 2 request: POST /resubmit (JSON) แล้วค่อย POST /files -> ถ้าไฟล์พังจะค้าง DC,N ส่งซ้ำไม่ได้
    */
   private handleResubmit(data: CreateLeaveRequest): void {
     const id = this.resubmitId;
@@ -220,32 +219,25 @@ export class LeaveFormComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.leaveService.resubmitLeave(id, data).pipe(
+    const files = this.uploadZone?.pendingFiles ? [...this.uploadZone.pendingFiles] : [];
+
+    this.leaveService.resubmitLeave(id, data, files).pipe(
       takeUntil(this.destroy$)
     ).subscribe({
-      next: async () => {
-        const hasPending = this.uploadZone?.pendingFiles?.length > 0;
-
-        if (hasPending) {
-          try {
-            await this.uploadZone.uploadAll();
-            this.msg = 'ส่งคำขออีกครั้งเรียบร้อย ✅';
-            this.isError = false;
-          } catch (err: any) {
-            this.msg = err?.error?.message || err?.message || 'อัปโหลดไฟล์ล้มเหลว';
-            this.isError = true;
-          } finally {
-            this.isSubmitting = false;
-          }
-        } else {
-          this.msg = 'ส่งคำขออีกครั้งเรียบร้อย ✅';
-          this.isError = false;
-          this.isSubmitting = false;
+      next: () => {
+        // สำเร็จแบบ atomic — เคลียร์ pending และโหลดไฟล์ใหม่
+        if (files.length > 0 && this.uploadZone) {
+          this.uploadZone.pendingFiles = [];
+          this.uploadZone.loadExistingFiles();
         }
+        this.msg = 'ส่งคำขออีกครั้งเรียบร้อย ✅';
+        this.isError = false;
+        this.isSubmitting = false;
+        setTimeout(() => this.router.navigate(['/dashboard']), this.NAVIGATION_DELAY_MS);
       },
       error: (err) => {
         this.isSubmitting = false;
-        this.msg = err.error?.message || 'เกิดข้อผิดพลาด';
+        this.msg = err.error?.message || err?.message || 'เกิดข้อผิดพลาด';
         this.isError = true;
       },
     });

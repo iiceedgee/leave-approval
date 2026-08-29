@@ -70,7 +70,7 @@ const documentService = new DocumentService(db);
 
 // Routes — API มาก่อน SPA catch-all
 app.use('/api/auth', authRoute(authService));
-app.use('/api/leave', leaveRoute(leaveService));
+app.use('/api/leave', leaveRoute(leaveService, fileService));
 app.use('/api/approval', approvalRoute(leaveService));
 app.use('/api/leave', fileRoute(fileService));
 app.use('/api/approval', documentRoute(documentService));

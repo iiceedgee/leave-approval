@@ -1,14 +1,14 @@
 const { Router } = require('express');
 const authMiddleware = require('../middleware/auth.middleware');
 const roleMiddleware = require('../middleware/role.middleware');
-const { isValidId } = require('../middleware/upload.middleware');
+const { isValidId, upload, handleMulterError } = require('../middleware/upload.middleware');
 
 function validateId(req, res, next) {
   if (!isValidId(req.params.id)) return res.status(400).json({ message: 'รหัสคำขอไม่ถูกต้อง' });
   next();
 }
 
-module.exports = function (leaveService) {
+module.exports = function (leaveService, fileService) {
   const router = Router();
 
   router.use(authMiddleware);
@@ -51,15 +51,93 @@ module.exports = function (leaveService) {
     } catch(err){ next(err); }
   });
 
-  // POST /api/leave/:id/resubmit — พนักงานส่งใหม่หลังจากถูกส่งกลับ (คิวไฟล์ไว้ก่อนค่อยส่งพร้อมกัน)
-  router.post('/:id/resubmit', validateId, roleMiddleware('emp'), async (req, res, next) => {
-    try {
-      const id = req.params.id;
-      const leave = await leaveService.resubmit(id, req.user.id, req.body);
-      if (!leave) return res.status(400).json({ message: 'ไม่สามารถส่งใหม่ได้' });
-      if (leave.error) return res.status(400).json({ message: leave.error });
-      res.json(leave);
-    } catch(err){ next(err); }
+  // POST /api/leave/:id/resubmit — พนักงานส่งใหม่หลังจากถูกส่งกลับ (รองรับ multipart ส่งไฟล์พร้อมกันแบบ atomic)
+  router.post('/:id/resubmit', validateId, roleMiddleware('emp'), (req, res, next) => {
+    upload.array('files', 5)(req, res, async (err) => {
+      if (err) return handleMulterError(err, req, res, next);
+      try {
+        const id = req.params.id;
+        // รวม data จาก body (รองรับทั้ง JSON และ multipart)
+        const data = {
+          leave_type: req.body.leave_type,
+          start_date: req.body.start_date,
+          end_date: req.body.end_date,
+          reason: req.body.reason,
+        };
+        // ลบ undefined ออกเพื่อให้ service ใช้ค่าเดิม
+        Object.keys(data).forEach(k => data[k] === undefined && delete data[k]);
+        // ถ้ามีไฟล์แนบมาด้วย — ตรวจโควตา 5 ไฟล์ + กันชื่อซ้ำก่อน resubmit (atomic: save ก่อนเปลี่ยนสถานะ)
+        if (req.files && req.files.length > 0) {
+          if (!fileService) {
+            return res.status(500).json({ message: 'fileService ไม่พร้อม' });
+          }
+          // ตรวจโควตาและชื่อซ้ำรวมไฟล์เดิม
+          try {
+            const existingFiles = await fileService.getFiles(id);
+            const totalAfter = (existingFiles?.length || 0) + req.files.length;
+            if (totalAfter > 5) {
+              if (!process.env.VERCEL) {
+                for (const f of req.files) { try { if (f.path) require('fs').unlinkSync(f.path); } catch {} }
+              }
+              return res.status(400).json({ message: `อัปโหลดได้สูงสุด 5 ไฟล์ (มีอยู่แล้ว ${existingFiles.length} ไฟล์ จะเพิ่มอีก ${req.files.length} ไฟล์ รวมเป็น ${totalAfter} ไฟล์)` });
+            }
+            const existingNames = new Set((existingFiles || []).map(x => (x.original_name || '').toLowerCase()));
+            const seen = new Set();
+            for (const f of req.files) {
+              let dec = f.originalname || '';
+              try { dec = Buffer.from(dec, 'latin1').toString('utf8'); } catch {}
+              dec = dec.toLowerCase();
+              if (existingNames.has(dec) || seen.has(dec)) {
+                if (!process.env.VERCEL) {
+                  for (const x of req.files) { try { if (x.path) require('fs').unlinkSync(x.path); } catch {} }
+                }
+                return res.status(400).json({ message: `ไฟล์ชื่อซ้ำ: ${f.originalname} มีอยู่แล้ว` });
+              }
+              seen.add(dec);
+            }
+          } catch (countErr) {
+            console.error('[leave.route] resubmit count check error', countErr.message);
+          }
+          // save ไฟล์ก่อน resubmit — ถ้า save พังจะไม่เปลี่ยนสถานะ ให้ retry ได้
+          const saved = [];
+          for (const f of req.files) {
+            try {
+              saved.push(await fileService.saveFile(id, req.user.id, f, 'emp'));
+            } catch (saveErr) {
+              console.error('[leave.route] resubmit saveFile failed', saveErr.message);
+              // cleanup ที่ save ไปแล้วบางส่วน
+              for (const s of saved) { try { await fileService.deleteFile(id, s.id, req.user.id); } catch {} }
+              if (!process.env.VERCEL) {
+                for (const x of req.files) { try { if (x.path) require('fs').unlinkSync(x.path); } catch {} }
+              }
+              if (saveErr.message && saveErr.message.includes('Upload failed')) {
+                return res.status(502).json({ message: 'อัปโหลดไฟล์ล้มเหลว (storage)', error: saveErr.message });
+              }
+              throw saveErr;
+            }
+          }
+        }
+        const leave = await leaveService.resubmit(id, req.user.id, Object.keys(data).length ? data : req.body);
+        if (!leave) return res.status(400).json({ message: 'ไม่สามารถส่งใหม่ได้' });
+        if (leave.error) {
+          // ถ้า resubmit fail แต่ไฟล์เพิ่ง save ไปแล้ว — ลบไฟล์ที่เพิ่ง save กลับ (rollback)
+          if (req.files && req.files.length > 0) {
+            try {
+              const allFiles = await fileService.getFiles(id);
+              // ลบเฉพาะไฟล์ที่ชื่อตรงกับที่เพิ่งอัปโหลด
+              for (const f of req.files) {
+                let dec = f.originalname || '';
+                try { dec = Buffer.from(dec, 'latin1').toString('utf8'); } catch {}
+                const match = (allFiles || []).find(x => (x.original_name || '').toLowerCase() === dec.toLowerCase());
+                if (match) try { await fileService.deleteFile(id, match.id, req.user.id); } catch {}
+              }
+            } catch {}
+          }
+          return res.status(400).json({ message: leave.error });
+        }
+        res.json(leave);
+      } catch (err) { next(err); }
+    });
   });
 
   // POST /api/leave/:id/cancel — พนักงานยกเลิกคำขอตัวเอง

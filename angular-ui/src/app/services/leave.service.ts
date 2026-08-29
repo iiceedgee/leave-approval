@@ -23,7 +23,16 @@ export class LeaveService {
     return this.http.post<Leave>(`${this.apiUrl}/leave`, data);
   }
 
-  resubmitLeave(id: string, data: CreateLeaveRequest): Observable<Leave> {
+  resubmitLeave(id: string, data: CreateLeaveRequest, files?: File[]): Observable<Leave> {
+    if (files && files.length > 0) {
+      const formData = new FormData();
+      formData.append('leave_type', data.leave_type);
+      formData.append('start_date', data.start_date);
+      formData.append('end_date', data.end_date);
+      formData.append('reason', data.reason);
+      for (const f of files) formData.append('files', f);
+      return this.http.post<Leave>(`${this.apiUrl}/leave/${id}/resubmit`, formData);
+    }
     return this.http.post<Leave>(`${this.apiUrl}/leave/${id}/resubmit`, data);
   }
 
