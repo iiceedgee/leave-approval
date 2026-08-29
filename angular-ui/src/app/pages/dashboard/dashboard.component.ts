@@ -1,5 +1,6 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Router } from '@angular/router';
+import { Subject, takeUntil } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
 import { LeaveService } from '../../services/leave.service';
 import { Leave } from '../../models/leave.model';
@@ -11,10 +12,11 @@ import { User } from '../../models/user.model';
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.scss']
 })
-export class DashboardComponent implements OnInit {
+export class DashboardComponent implements OnInit, OnDestroy {
   user: User | null = null;
   leaves: Leave[] = [];
   loading = true;
+  private destroy$ = new Subject<void>();
 
   readonly roleLabels: Record<string, string> = { emp: 'พนักงาน', mgr: 'หัวหน้า', hr: 'HR' };
 
@@ -30,7 +32,7 @@ export class DashboardComponent implements OnInit {
     } catch {
       this.user = null;
     }
-    this.leaveService.getLeaves().subscribe({
+    this.leaveService.getLeaves().pipe(takeUntil(this.destroy$)).subscribe({
       next: (data) => {
         this.leaves = (Array.isArray(data) ? data : [])
           .slice()
@@ -41,11 +43,21 @@ export class DashboardComponent implements OnInit {
     });
   }
 
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
   get title(): string {
     if (!this.user) return '';
     if (this.user.role === 'emp') return 'รายการคำขอของฉัน';
     if (this.user.role === 'mgr') return 'คำขอลาที่รอฉันตรวจสอบ';
     return 'คำขอลาทั้งหมด';
+  }
+
+  isOwner(leave: any): boolean {
+    if (!leave || !this.user?.id) return false;
+    return String(leave.user_id) === String(this.user.id);
   }
 
   logout(): void {

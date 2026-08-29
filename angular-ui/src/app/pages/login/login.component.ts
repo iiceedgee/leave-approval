@@ -16,6 +16,8 @@ export class LoginComponent {
   constructor(private auth: AuthService, private router: Router) {}
 
   login(): void {
+    this.username = this.username.trim();
+    this.password = this.password.trim();
     if (!this.username || !this.password) {
       this.error = 'กรุณากรอก username และ password';
       return;
