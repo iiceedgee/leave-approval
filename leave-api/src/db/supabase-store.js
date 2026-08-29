@@ -80,6 +80,31 @@ class SupabaseStore {
   }
 
   async _nextRequestNo() {
+    // กัน request_no ชนกันตอนกดพร้อมกัน — ใช้ sequence แบบ atomic
+    // เดิมใช้ MAX+1 แล้ว +1 ในแอป ทำให้ 2 request ที่อ่านค่า max เดียวกัน (09:00:00.001)
+    // ได้เลขเดียวกันแล้ว unique violation (23505) ต้อง retry
+    // ตอนนี้ลองเรียก sequence ก่อน (nextval เป็น atomic ใน Postgres) ถ้าไม่มี function ค่อย fallback
+    try {
+      const { data, error } = await this.supabase.rpc('next_request_no');
+      if (!error && data) {
+        if (typeof data === 'string' && data.startsWith('LV-')) return data;
+        // เผื่อ Supabase ห่อเป็น object
+        if (data && typeof data === 'object' && data.request_no) return data.request_no;
+        // ถ้า function คืนเป็น string แต่มี quote ครอบ
+        if (typeof data === 'string') return data;
+      }
+      if (error) {
+        const msg = `${error.message || ''} ${error.code || ''} ${error.details || ''}`.toLowerCase();
+        const isNotFound = msg.includes('not found') || msg.includes('pgrst202') || msg.includes('42883') || msg.includes('does not exist') || error.code === 'PGRST202' || error.code === '42883' || String(error.code) === '404';
+        if (!isNotFound) {
+          console.warn('[DB] next_request_no RPC error, fallback to MAX+1:', error.message || error);
+        }
+      }
+    } catch (e) {
+      // RPC throw (เช่น network) -> fallback เงียบๆ
+    }
+
+    // Fallback: MAX+1 เดิม (ยังดีกว่าไม่มีเลข) — เก็บไว้เพื่อ backward compat กรณี DB ยังไม่รัน migration
     const year = new Date().getFullYear();
     const prefix = `LV-${year}-`;
     try {
