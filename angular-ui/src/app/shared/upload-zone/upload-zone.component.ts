@@ -32,6 +32,11 @@ export class UploadZoneComponent implements OnInit, OnDestroy, OnChanges {
   loading = false;
   uploading = false;
   isDragging = false;
+
+  get occupied(): number { return this.pendingFiles.length + this.existingFileList.length; }
+  get remaining(): number { return Math.max(0, this.maxFiles - this.occupied); }
+  get canAddMore(): boolean { return this.occupied < this.maxFiles; }
+  get remainingText(): string { return `${this.remaining}/${this.maxFiles}`; }
   previewFile: {
     file: UploadedFile;
     url: string;
@@ -81,6 +86,10 @@ export class UploadZoneComponent implements OnInit, OnDestroy, OnChanges {
   onDrop(event: DragEvent): void {
     event.preventDefault();
     this.isDragging = false;
+    if (!this.canAddMore) {
+      this.toast.warning('ครบ 5 ไฟล์แล้ว ลบไฟล์เดิมก่อน');
+      return;
+    }
     if (event.dataTransfer?.files) {
       this.addFiles(Array.from(event.dataTransfer.files));
     }
@@ -88,6 +97,11 @@ export class UploadZoneComponent implements OnInit, OnDestroy, OnChanges {
 
   onFileSelect(event: Event): void {
     const input = event.target as HTMLInputElement;
+    if (!this.canAddMore) {
+      this.toast.warning('ครบ 5 ไฟล์แล้ว ลบไฟล์เดิมก่อน');
+      input.value = '';
+      return;
+    }
     if (input.files) {
       this.addFiles(Array.from(input.files));
       input.value = '';

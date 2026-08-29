@@ -237,8 +237,15 @@ export class LeaveFormComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.isSubmitting = false;
-        this.msg = err.error?.message || err?.message || 'เกิดข้อผิดพลาด';
-        this.isError = true;
+        // 409 = โดน tab อื่นชิงไปแล้ว — ให้รีเฟรชแทนโชว์ 400 งง
+        if (err.status === 409) {
+          this.msg = err.error?.message || 'คำขอนี้ถูกส่งไปแล้ว กำลังรีเฟรช';
+          this.isError = true;
+          setTimeout(() => this.router.navigate(['/dashboard']), 1200);
+        } else {
+          this.msg = err.error?.message || err?.message || 'เกิดข้อผิดพลาด';
+          this.isError = true;
+        }
       },
     });
   }

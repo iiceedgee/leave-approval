@@ -133,7 +133,8 @@ module.exports = function (leaveService, fileService) {
               }
             } catch {}
           }
-          return res.status(400).json({ message: leave.error });
+          const statusCode = leave.statusCode === 409 ? 409 : 400;
+          return res.status(statusCode).json({ message: leave.error });
         }
         res.json(leave);
       } catch (err) { next(err); }

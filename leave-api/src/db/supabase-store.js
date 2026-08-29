@@ -209,6 +209,21 @@ class SupabaseStore {
     throw error;
   }
 
+  // Atomic update — ใช้ WHERE กันชน 2 tab (optimistic lock)
+  // UPDATE ... WHERE id=:id AND flag_send_back='Y' AND current_status='SU' RETURNING
+  // ถ้าไม่มีแถวกลับมา = โดนคนอื่นชิงไปแล้ว → return null ให้ service ตอบ 409
+  async updateLeaveWhere(id, fields, where) {
+    fields.updated_at = new Date().toISOString();
+    let query = this.supabase.from('leave_requests').update(fields).eq('id', id);
+    for (const [k, v] of Object.entries(where || {})) {
+      query = query.eq(k, v);
+    }
+    const { data, error } = await query.select().maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    return this._normalizeLeave(data);
+  }
+
   // ---- history ----
   async addHistory(data) {
     const { data: item, error } = await this.supabase

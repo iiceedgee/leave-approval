@@ -869,18 +869,21 @@ hr       | all  + DC เท่านั้น       | DC แดง              
 
 ---
 
-### Q70: กดส่ง 2 tab พร้อมกัน ทำไม tab หลังพัง? (B - กันชนแบบไม่ต้อง RPC)
+### Q70: กดส่ง 2 tab พร้อมกัน ทำไม tab หลังพัง? กันด้วย WHERE ยังไง (B - ไม่ต้อง RPC)
 
 **ถาม:** พี่เปิด 2 tab กด "ส่งคำขออีกครั้ง" พร้อมกัน ทำไม tab หลังขึ้น "ไม่ได้ถูกส่งกลับแก้ไข" ครับ?
 
-**ตอบ:**
-• **ทำไมพัง:** เดิม `getLeave → if(flag!=='Y') → UPDATE` แยก 2 ขั้น — 2 tab อ่าน `SU,Y` ได้ทั้งคู่ ผ่าน Gate ทั้งคู่ แล้วแย่งกัน `UPDATE DC,N` คนหลังเลย `400`
-• **แก้ B ไม่ต้อง RPC:** `supabase-store.js:189` เปลี่ยนเป็น `UPDATE ... WHERE flag='Y' AND status='SU' RETURNING *` → ถ้าไม่ได้แถวกลับมา = โดนชิงไปแล้ว → ตอบ `409 กดไปแล้ว กำลังรีเฟรช` แทน `400` งง
-• **กันพลาดตั้งแต่ก่อนกด:** `upload-zone.ts:98` โชว์ `เหลืออีก X ไฟล์` + `input disabled เมื่อครบ 5` (นับ `pending+existing`) กันเลือกเกินตั้งแต่ต้น ไม่ต้องรอ backend ด่า
+**ตอบยาว (ท่อง 45 วิ — จำประโยคเดียวก็พอ):**
+• **ทำไมพัง — อ่านแล้วเขียนแยกกัน:** เดิม `leave.service.js:154` ทำ `1. getLeaveById → 2. if(flag!=='Y') return 400 → 3. updateLeave(DC,N)` แยก 3 query — 2 tab อ่าน `SU,Y` ได้ทั้งคู่ที่ `09:00:00.001` ผ่าน `if` ทั้งคู่ แล้วแย่งกัน `UPDATE` คนหลังควรพังแต่ดันได้ `400 ไม่ได้ถูกส่งกลับ` ทำให้ user งงว่าตัวเองทำผิด
+• **วิธีแก้ B — รวมเป็น query เดียวด้วย WHERE:** `supabase-store.js:189` เพิ่ม `updateLeaveWhere(id, fields, where)` → `UPDATE leave_requests SET status='DC', flag='N' WHERE id=:id AND flag_send_back='Y' AND current_status='SU' RETURNING *` — บอก DB ว่า "เปลี่ยนให้หน่อย แต่ทำเฉพาะแถวที่ยังเป็น Y นะ" ถ้า tab แรกทำได้ DB ส่งแถวกลับมา 1 แถว → `200` ถ้า tab หลังมาถึงหา `Y` ไม่เจอแล้วได้ `0 แถว` → เราเช็ค `if(!data) return 409`
+• **ข้อดีของ WHERE:** ไม่ต้อง `FOR UPDATE` lock, 1 query จบ, ไม่ต้องสร้าง `RPC` บน Prod, กันได้เลย เป็น `optimistic lock`
+• **ข้อเสีย:** ถ้า logic ซับซ้อนต้องเขียน `WHERE` ยาว, กันได้แค่ `flag/status` ถ้าจะกันไฟล์+history ต้อง `RPC` แบบ `Phase A`
+• **ได้อะไร:** tab หลังได้ `409 Conflict "คำขอนี้ถูกส่งไปแล้ว กำลังรีเฟรช"` แทน `400` — user รู้ว่าชน ไม่ใช่ทำผิด + `leave-form.ts:240` รีเฟรชไป `dashboard` เอง
+• **กันพลาดตั้งแต่ก่อนกด — UX ล็อค:** `upload-zone.ts:98` เพิ่ม `occupied = pending+existing`, `remaining = 5-occupied`, `canAddMore = occupied<5` → `upload-zone.html:18` `[disabled]="!canAddMore"` + โชว์ `เหลืออีก {{remaining}}/5 ไฟล์ ({{occupied}}/5)` + `title ครบ 5 แล้ว ลบก่อน` — กันเลือกไฟล์ครั้งที่ 6 ตั้งแต่ก่อนกด ไม่ต้องรอ backend ด่า `400 เกิน 5`
 
-**ไฟล์:** `supabase-store.js:189` `leave.service.js:174` `upload-zone.ts:98` `leave-form.ts:152`
+**ไฟล์:** `supabase-store.js:189` `store.js:121` `leave.service.js:174` `leave.route.js:136` `upload-zone.component.ts:31,98` `upload-zone.html:18` `leave-form.ts:240`
 
-> **สรุป Q70:** `WHERE flag='Y' RETURNING` กันชน 2 tab + `disabled เมื่อครบ 5` กันเกิน — RPC ไว้ `Phase A` ค่อยทำ `FOR UPDATE`
+> **สรุป Q70:** `WHERE flag='Y' RETURNING` กันชน 2 tab แบบ 1 query → `409` รู้ว่าชน + `disabled เมื่อครบ 5` กันเกินตั้งแต่ FE — `RPC FOR UPDATE` ไว้ `Phase A` ค่อยทำ `BEGIN; SELECT ... FOR UPDATE; INSERT docs; UPDATE; COMMIT`
 
-**ยืนยัน Q70 29 ส.ค. 2026 (B ยังไม่ทำ — ทำตอนลงมือ):** `supabase-store.js:189` `leave.service.js:174` `upload-zone.ts:98` | **Phase A next:** `rpc_resubmit_with_files + FOR UPDATE`
+**ยืนยัน Q70 29 ส.ค. 2026 (B ทำแล้ว):** `supabase-store.js:189` `leave.service.js:174` `upload-zone.ts:31,98` `upload-zone.html:18` | **Phase A next:** `rpc_resubmit_with_files` ถ้าจะทำ transaction ไฟล์+history ก้อนเดียว
 

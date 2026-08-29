@@ -177,7 +177,26 @@ class LeaveService {
     if (data.end_date) updateFields.end_date = data.end_date;
     if (data.reason) updateFields.reason = String(data.reason).trim();
 
-    const updated = await this.db.updateLeave(leaveId, updateFields);
+    // Atomic: UPDATE WHERE flag='Y' AND status='SU' — กัน 2 tab แย่งกัน (optimistic lock)
+    let updated = null;
+    if (typeof this.db.updateLeaveWhere === 'function') {
+      updated = await this.db.updateLeaveWhere(leaveId, updateFields, { flag_send_back: 'Y', current_status: STATUS.SU.code });
+      if (!updated) {
+        // ลองเช็ค F legacy (DB เก่า) — ถ้าแถวเป็น F ก็ให้ผ่านเหมือนกัน
+        const legacyWhere = { flag_send_back: 'Y', current_status: 'F' };
+        updated = await this.db.updateLeaveWhere(leaveId, { ...updateFields, current_status: 'F' }, legacyWhere);
+        if (updated) updated = { ...updated, current_status: STATUS.SU.code };
+      }
+      if (!updated) {
+        const fresh = await this.db.getLeaveById(leaveId);
+        if (fresh && fresh.current_status === STATUS.DC.code && fresh.flag_send_back === 'N') {
+          return { error: 'คำขอนี้ถูกส่งไปแล้ว กำลังรีเฟรช', statusCode: 409 };
+        }
+        return { error: 'คำขอนี้ไม่ได้ถูกส่งกลับแก้ไข' };
+      }
+    } else {
+      updated = await this.db.updateLeave(leaveId, updateFields);
+    }
 
     await this.db.addHistory({
       leave_request_id: leaveId,

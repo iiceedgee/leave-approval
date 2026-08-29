@@ -126,6 +126,20 @@ class InMemoryStore {
     return leave;
   }
 
+  async updateLeaveWhere(id, fields, where) {
+    const leave = this.leaves.find(l => l.id === id);
+    if (!leave) return null;
+    // เช็ค WHERE ทุกเงื่อนไข — ถ้าไม่ตรง return null (โดนชิงแล้ว)
+    if (where) {
+      for (const [k, v] of Object.entries(where)) {
+        if (String(leave[k]) !== String(v)) return null;
+      }
+    }
+    fields.updated_at = new Date().toISOString();
+    Object.assign(leave, fields);
+    return this._norm(leave);
+  }
+
   // ---- history ----
   async addHistory(data) {
     const item = { id: this._uuid(), created_at: new Date().toISOString(), ...data };
