@@ -78,14 +78,20 @@
       </span>
 
       <div class="form-group">
-        <label for="reason">เหตุผล</label>
+        <label for="reason">เหตุผล <span class="required">*</span></label>
         <textarea
           id="reason"
           rows="3"
           [(ngModel)]="reason"
-          placeholder="ระบุเหตุผลการลา (ถ้ามี)"
+          placeholder="ระบุเหตุผลการลา"
           [disabled]="isSubmitting"
+          [class.input-error]="isError && (!reason || reason.trim().length < 5)"
+          aria-required="true"
+          [attr.aria-invalid]="isError && (!reason || reason.trim().length < 5) ? 'true' : 'false'"
+          aria-describedby="reason-hint reason-error"
         ></textarea>
+        <span id="reason-hint" class="field-hint" *ngIf="!isError || (reason && reason.trim().length >= 5)">อย่างน้อย 5 ตัวอักษร</span>
+        <span id="reason-error" class="field-error" *ngIf="isError && (!reason || reason.trim().length < 5)" role="alert">เหตุผลต้องมีอย่างน้อย 5 ตัวอักษร</span>
       </div>
     </div>
 
@@ -109,8 +115,8 @@
       <div class="upload-body" [hidden]="!showUploadSection">
         <p class="upload-hint">
           <i class="fa-regular fa-circle-info"></i>
-          <span *ngIf="!isResubmit">บังคับแนบอย่างน้อย 1 ไฟล์ — ไฟล์จะถูกส่งพร้อมยื่นคำขอ (สูงสุด 10 ไฟล์, ไฟล์ละไม่เกิน 10MB, รองรับ .pdf .jpg .png .docx)</span>
-          <span *ngIf="isResubmit">แนบไฟล์ประกอบคำขอลา เช่น ใบรับรองแพทย์ หรือเอกสารอื่น ๆ ที่เกี่ยวข้อง (สูงสุด 10 ไฟล์, ไฟล์ละไม่เกิน 10MB, รองรับ .pdf .jpg .png .docx)</span>
+          <span *ngIf="!isResubmit">บังคับแนบอย่างน้อย 1 ไฟล์ — ไฟล์จะถูกส่งพร้อมยื่นคำขอ (สูงสุด 5 ไฟล์, ไฟล์ละไม่เกิน 10MB, รองรับ .pdf .jpg .png .docx)</span>
+          <span *ngIf="isResubmit">แนบไฟล์ประกอบคำขอลา เช่น ใบรับรองแพทย์ หรือเอกสารอื่น ๆ ที่เกี่ยวข้อง (สูงสุด 5 ไฟล์, ไฟล์ละไม่เกิน 10MB, รองรับ .pdf .jpg .png .docx)</span>
         </p>
         <app-upload-zone
           #uploadZone
