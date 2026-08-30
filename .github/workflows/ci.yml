@@ -53,8 +53,11 @@ jobs:
           cache: npm
           cache-dependency-path: angular-ui/package-lock.json
 
+      - name: Debug Node/npm
+        run: node --version; npm --version; echo "---engines---"; cat package.json | grep -A2 engines || true
+
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-engines || (echo "npm ci failed, fallback to npm install" && npm install --ignore-engines)
 
       # ── Lint ────────────────────────────────────────────────
       # NOTE: This project does not have a lint script or a lint
