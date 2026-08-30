@@ -956,3 +956,127 @@ hr       | all  + DC เท่านั้น       | DC แดง              
 
 **ยืนยัน P0+P1+P2 29 ส.ค. 2026:** `app.js:50,78` `file.route.js:149` `verification-file.route.js:56` `supabase-store.js:82` `migration_next_request_no.sql` | **Build:** `npm test 53 passed` | **Loop:** `emp01/mgr01/hr01 SU→DC→MA→AP ✔`
 
+---
+
+## ส่วนที่ 12: Fix Log P0/P1/P1.6 — สิ่งที่แก้ไข + เพราะอะไร (29 ส.ค. 2026) — Table สรุป 1 หน้า
+
+> อ่าน 30 วินาที — เห็นทั้งหมดที่แก้ก่อนสัมภาษณ์ TISCO | ไม่ลบ Q1-Q75 เดิม ต่อท้ายไว้สแกนเร็ว
+
+| # | ปัญหาเดิม | เพราะอะไรต้องแก้ | แก้ที่ไหน | ไฟล์:บรรทัด |
+|---|---|---|---|---|
+| P0-1 | `GET /api/debug/constraint` เปิด public เห็น `keyPrefix`+`statusCounts` | Information Disclosure High ใครก็ยิงได้ | ล็อค `authMiddleware + roleMiddleware('hr')` + ปิดเมื่อ `ENABLE_DEBUG!=='1'` | `debug.route.js:8-10` `app.js:78,92-95` |
+| P0-2 | `FIX_KEY` hardcode `'fix-2026-leave'` ใน git | ใครอ่าน git ยิง `ALTER TABLE` ได้ | ลบ fallback เหลือ `process.env.FIX_KEY` เดียว | `debug.route.js:94` |
+| P0-3 | `POST /api/debug/fix` รัน `ALTER/DROP` 10 คำสั่งไม่มี transaction | พังกลางคัน DB เพี้ยน | ห่อใน `BEGIN/COMMIT` + auth `hr` | `debug.route.js:108-129` |
+| P1-1 | `request_no MAX+1` 2 คนยื่นพร้อมกันได้ `LV-2026-0006` ซ้ำ | Race `read-modify-write` | `SEQUENCE nextval` atomic | `supabase-store.js:82-88` `migration_next_request_no.sql:15,19` |
+| P1-2 | `resubmit` 2 request ไม่ atomic `flag Y→N` ค้าง 400 | ส่งไฟล์กับอัปเดตสถานะแยก request | `multipart เดียว` `upload.array` → `saveFile` ก่อน `resubmit` | `leave.route.js:55,149` `leave.service.js:174-189` |
+| P1-3 | 2 tab ชน `SU+Y` ส่งกลับ กดพร้อมกัน | `updateLeave` ไม่มี `WHERE` | `updateLeaveWhere WHERE flag='Y' AND status='SU' RETURNING → 409` | `supabase-store.js:189,240` `leave.service.js:192` |
+| P1-4 | `maxFiles` drift `hint 10` แต่ `multer 5` | FE บอก 10 BE กัน 5 เกินโค้วตา | sync 5 ทั้ง 3 routes + `ellipsis on overflow` | `upload-zone.ts:19,98` `file.route.js:40,75` `verification-file.route.js:56` |
+| P1-5 | Stepper 5 ขั้น `VC` แยก `RJ แดง 3 ขั้น` | Prod `violates check constraint` `F vs SU` | รวม `VC→DC` เหลือ 4 ขั้น `SU DC MA + Final AP/RJ/CX` polymorphic slot เดียว | `stepper.service.js:11,27` `status.js:27` `59d458f` |
+| P1-6 | สี drift `MA เหลือง` `done เขียวไม่ตรง` | UX สับสน | unify `done #2e7d32` + `timeline dot` แดง | `stepper.component.scss:21` `timeline.component.scss:15` |
+| P1.5-1 | Bell `emp` เห็นแดงมั่ว `hr` ไม่แดง `SB` | `poll 15s` กรอง `DC,MA` ทุก role | `isNeedsCheck(role)` `emp:SU+Y / mgr:DC\|MA / hr:DC` | `notification-bell.ts:99,135` |
+| P1.5-2 | Bell `read` หายเมื่อ refresh + บวม 1000 แถว | `readKey=id` ไม่มี status + `fetch all` | `readKey=id:status` + `localStorage notif_read_ids:${userId} prefix` + `slice 10` | `notification-bell.ts:46,87,95` |
+| P2-1 | `rateLimit` ไม่มี | brute-force `/auth` | `10 req/min/IP` | `app.js:50` |
+| P2-2 | `approve/sendBack` ยัง Race `get→check→update` 3 query | ไม่มี `FOR UPDATE` | แผน `UPDATE WHERE RETURNING 409` หรือ `rpc FOR UPDATE` (ยังไม่แก้ เหลือเป็นแผน P2) | `leave.service.js:213` `supabase-store.js:215` |
+
+> **สรุป Fix Log:** P0 ปิด 3 จุด / P1 ปิด 6 จุด / P1.5 ปิด 2 จุด / P2 ปิด `rateLimit+sequence` เหลือ `Race approve / N+1 / audit memory` เป็นแผนหลังสัมภาษณ์ (ท่องว่า `Phase 6 ย้ายลง DB` ก็พอ)
+
+---
+
+## ส่วนที่ 13: คลังคำถามที่อาจถาม + สคริปต์ตอบ ไทย+อังกฤษคู่ (Q76-Q85) — ครอบคลุม 3 โปรเจค
+
+> 10 ข้อใหม่ต่อจาก Q75 — ไม่ลบของเดิม | ภาษาไทยอ่านง่าย 45 วิ + อังกฤษ 1 ประโยค + ไฟล์:บรรทัด + กับดัก
+
+### Q76: ตอนนี้มี Race ตรงไหนบ้าง แล้วจะแก้ยังไง? (ถามแน่ 90%)
+
+*   **โค้ด:** `leave.service.js:213 transition()` `updateLeave` ไม่มี `WHERE` ยัง Race 100% / `leave.service.js:182 resubmit` แก้แล้ว `updateLeaveWhere WHERE flag='Y' AND status='SU' RETURNING 409` / `supabase-store.js:82 rpc nextval` แก้ `request_no` แล้ว
+*   **ถามไทย:** "น้องครับ 2 หัวหน้ากดอนุมัติใบ `MA` เดียวกัน `09:00:00.001` จะเกิดอะไร? จะแก้ยังไง?"
+*   **ตอบไทย (ท่อง 60 วิ - ขยายตามที่ขอ):** "Race คือ 2 request อ่านค่าเก่า `MA` พร้อมกันแล้วทับกันครับ `09:00:00.001` A `GET` เห็น `MA` `00.002` B ก็ `GET` เห็น `MA` `00.003` A `check pass` → `UPDATE AP` สำเร็จ `00.004` B ที่อ่านค่าเก่าไว้ก็ `pass` เหมือนกัน → `UPDATE AP` ทับอีกรอบ ได้ history ซ้ำครับ โค้ดปัจจุบัน `leave.service.js:213 transition()` ยัง `get→check→update` 3 query แยก ไม่มี `WHERE` เลย fail แต่ `resubmit` ที่ `182` ผมแก้แล้วด้วย `updateLeaveWhere WHERE flag='Y' AND status='SU' RETURNING` ถ้าได้ `null` return `409 ถูกดำเนินการไปแล้ว` กัน 2 tab ได้แล้ว ส่วน `approve` ถ้าขึ้น Prod จะทำ `UPDATE ... WHERE current_status='MA' RETURNING` แบบเดียวกัน หรือ `SELECT FOR UPDATE` ใน `rpc` ครับ"
+*   **Answer EN:** "Race is two requests reading stale `MA` at `09:00:00.001-002`, both pass the gate and `UPDATE` to `AP` at `003-004`, duplicating history. Current `leave.service.js:213` uses `get→check→update` without `WHERE`, so it fails, but `resubmit:182` is fixed with `UPDATE ... WHERE flag='Y' AND status='SU' RETURNING  409`. For `approve` I will use `UPDATE ... WHERE status='MA' RETURNING` or `SELECT FOR UPDATE` via `rpc`."
+*   **ไฟล์:** `leave.service.js:213,182` `supabase-store.js:240,82` `migration_next_request_no.sql:15`
+*   **กับดักห้ามพูด:** "ไม่มี Race แล้ว" / "มี retry 3 ครั้งพอแล้ว"
+
+### Q77: JWT คืออะไร? ทำไมเก็บใน localStorage ถึงไม่ปลอดภัย? (ถามแน่ 80%)
+
+*   **โค้ด:** `auth.service.js:48 jwt.sign({id,role}, SECRET, 8h)` `auth.middleware.js:11 jwt.verify` `auth.service.ts:18 localStorage.setItem('token')` `jwt.interceptor.ts:15 Bearer`
+*   **ถามไทย:** "JWT คืออะไรครับ? ทำไมไม่ควรเก็บใน localStorage?"
+*   **ตอบไทย (ท่อง 60 วิ - ขยายตามที่ขอ):** "JWT คือ `header.payload.signature` คั่นด้วย `.` ครับ `header` บอก `HS256` `payload` มี `id, role, exp` ที่ `auth.service.js:48` `signature = HMACSHA256(base64(header).base64(payload), SECRET)` ไว้ `verify` ที่ `auth.middleware.js:11` ว่าไม่ถูกแก้ครับ ตอนนี้ Angular เก็บใน `localStorage` ที่ `auth.service.ts:18` แล้ว `jwt.interceptor.ts:15` เติม `Bearer` ทุกครั้ง มันง่ายแต่เสี่ยง `XSS` ครับ เพราะ `localStorage` อ่านด้วย `JS` ได้ ถ้าแฮกเกอร์ฝัง `<script>` ผ่านช่อง `reason` จะ `getItem('token')` ส่งออกไปได้เลย วิธีแก้คือ `httpOnly cookie` ให้ backend `res.cookie('token', jwt, {httpOnly:true, secure:true, sameSite:'strict'})` เบราว์เซอร์จะไม่ให้ `document.cookie` อ่านได้ XSS ขโมยไม่ได้ครับ เสริมด้วย `Refresh Token 15นาที/7วัน` + `Revoke blacklist` เพราะตอนนี้ `logout` แค่ `removeItem:29` token เก่ายังใช้ได้จนหมด 8 ชม. ครับ"
+*   **Answer EN:** "JWT is `header.payload.signature`; `signature = HMAC(base64(header).base64(payload), SECRET)` verified at `auth.middleware.js:11`. `localStorage` at `auth.service.ts:18` is readable by JS, so XSS can steal it via `getItem('token')`. Fix with `httpOnly cookie` (JS cannot read) plus `Refresh Token` and `Revoke blacklist`; currently `logout` only does `removeItem:29` so the old token stays valid for 8h."
+*   **ไฟล์:** `auth.service.js:48` `auth.middleware.js:11` `auth.service.ts:18,29` `jwt.interceptor.ts:15`
+*   **กับดักห้ามพูด:** "localStorage ปลอดภัยแล้ว" / "httpOnly กัน XSS 100% ไม่ต้องทำอย่างอื่น"
+
+### Q78: แล้ว `httpOnly cookie` แก้ไม่ได้เหรอ? ต้องทำอะไรเพิ่ม?
+
+*   **โค้ด:** `auth.service.ts:18` vs `res.cookie httpOnly`
+*   **ถามไทย:** "เปลี่ยนเป็น httpOnly แล้วจบเลยไหม?"
+*   **ตอบไทย (30 วิ):** "httpOnly กัน XSS ขโมยได้ แต่ต้องทำ `SameSite=strict + CSRF token` กัน `CSRF` เพิ่มครับ เพราะ cookie ส่งอัตโนมัติทุก request ถ้าแฮกเกอร์หลอกให้ยิง `POST /api/leave` จากเว็บอื่นจะติด cookie ไปด้วย ต้องมี `CSRF token` ใน header เช็คที่ `auth.middleware` อีกชั้นครับ แล้วต้องเปิด `CORS allowlist` ที่ `app.js:44` + ` helmet` ด้วยครับ"
+*   **Answer EN:** "httpOnly blocks XSS theft but needs `SameSite=strict + CSRF token` to block CSRF, plus `CORS allowlist` at `app.js:44` and `helmet`."
+*   **ไฟล์:** `app.js:44` `auth.middleware.js:11`
+*   **กับดัก:** "httpOnly จบไม่ต้องทำ CSRF"
+
+### Q79: `debug` ทำไมต้อง `admin` แล้ว `hr` เข้าไม่ได้? (กับดัก demo)
+
+*   **โค้ด:** `debug.route.js:10 roleMiddleware('admin')` `supabase-store.js:32 seed emp/mgr/hr` ไม่มี `admin` `app.js:78 ENABLE_DEBUG`
+*   **ถามไทย:** "พี่ลอง `curl /api/debug/constraint` ด้วย `hr` แล้วได้ `403` ทำไม?"
+*   **ตอบไทย (30 วิ):** "บั๊กผมครับ `debug.route.js:10` ใส่ `role admin` แต่ `seed` ที่ `supabase-store.js:32` มีแค่ `emp/mgr/hr` ไม่มี `admin` เลยไม่มีใครเข้าได้ ตอนนี้แก้ชั่วคราวเป็น `role hr` แล้วครับ และปิดเมื่อ `ENABLE_DEBUG!=='1'` ที่ `app.js:78` ไม่ให้ Prod เห็น `keyPrefix` ครับ"
+*   **Answer EN:** "My bug: `debug.route.js:10` requires `admin` but `supabase-store.js:32` seeds only `emp/mgr/hr`, so nobody can access. I changed it to `hr` and gate by `ENABLE_DEBUG` at `app.js:78`."
+*   **ไฟล์:** `debug.route.js:10` `supabase-store.js:32` `app.js:78`
+*   **กับดัก:** "ตั้งใจให้ admin อย่างเดียว"
+
+### Q80: `request_no` ทำไมต้อง `sequence` ไม่ใช้ `COUNT+1` พอเหรอ?
+
+*   **โค้ด:** `supabase-store.js:82 rpc nextval` `migration_next_request_no.sql:15,19` vs `MAX+1`
+*   **ถามไทย:** "มี `COUNT+1` ก็ได้เลขใหม่แล้ว ทำไมต้อง `sequence`?"
+*   **ตอบไทย (30 วิ):** "2 คนยื่นพร้อมกัน `09:00:00.001` อ่าน `MAX LV-2026-0005` ค่าเดียวกัน ได้ `0006` ซ้ำกัน คนที่ 2 โดน `23505` ต้อง retry 3 รอบที่ `150` เปลืองครับ `sequence nextval` ที่ `migration_next_request_no.sql:15` เป็น atomic ใน Postgres เรียกพร้อมกันได้ `0006/0007` ไม่ซ้ำเลยครับ"
+*   **Answer EN:** "Two users at `09:00:00.001` both read `MAX 0005` and generate duplicate `0006`, causing `23505` and 3 retries. `sequence nextval` at `migration_next_request_no.sql:15` is atomic and returns `0006/0007` without conflict."
+*   **ไฟล์:** `supabase-store.js:82` `migration_next_request_no.sql:15`
+*   **กับดัก:** "มี retry พอแล้ว"
+
+### Q81: `SU->DC` ทำไมต้อง `WHERE flag='Y'` กัน 2 tab? (Q70 ขยาย)
+
+*   **โค้ด:** `leave.service.js:182 updateLeaveWhere` `supabase-store.js:240 maybeSingle 409`
+*   **ถามไทย:** "เปิด 2 tab กดส่งกลับพร้อมกันจะเกิดอะไร?"
+*   **ตอบไทย (30 วิ):** "2 tab อ่าน `SU+Y` พร้อมกัน กด `resubmit` พร้อมกัน ถ้าใช้ `updateLeave` ธรรมดาจะเขียนทับกันได้ครับ ผมใช้ `updateLeaveWhere WHERE flag='Y' AND status='SU' RETURNING` ที่ `supabase-store.js:240` Tab แรกได้แถว Tab สองได้ `null` → return `409 Conflict ถูกดำเนินการไปแล้ว` กันทับกันครับ"
+*   **Answer EN:** "Two tabs read `SU+Y` together; `updateLeaveWhere WHERE flag='Y' AND status='SU' RETURNING` lets the first tab succeed and the second gets `null` → `409 Conflict`."
+*   **ไฟล์:** `leave.service.js:182` `supabase-store.js:240`
+*   **กับดัก:** "ไม่ต้องกัน 2 tab"
+
+### Q82: `maxFiles 5` แต่ hint บอก `10` ได้ไหม?
+
+*   **โค้ด:** `upload-zone.ts:19 maxFiles=5` `upload.middleware.js:62` `file.route.js:40,75` `verification-file.route.js:56` `leave-form.html:118`
+*   **ถามไทย:** "อัพ 10 ไฟล์ได้ไหมครับ hint บอก 10?"
+*   **ตอบไทย (20 วิ):** "ไม่ได้ครับ BE กัน 3 routes ที่ `file.route.js:40,75` `verification-file.route.js:56` + `multer 5` + `upload-zone.ts:19` ตอนนี้ sync เหลือ 5 ไฟล์ text-only + `ellipsis` กันล้นแล้วครับ hint 10 แก้แล้ว"
+*   **Answer EN:** "No, BE enforces 5 at `file.route.js:40,75` and `upload-zone.ts:19`; hint fixed to 5 text-only."
+*   **ไฟล์:** `upload-zone.ts:19` `file.route.js:40`
+*   **กับดัก:** "hint 10 ถูกแล้ว"
+
+### Q83: Bell ทำไมต้องแยก `Visibility vs Actionability` 2 แกน? (Q65 ขยาย)
+
+*   **โค้ด:** `notification-bell.ts:99 isActionRequired` `135 mgr DC|MA hr DC` `46 prefix userId`
+*   **ถามไทย:** "Bell แดงยังไง? ทำไม emp เห็น `MA` ไม่แดง?"
+*   **ตอบไทย (30 วิ):** "ผมแยก 2 แกนครับ `Visibility` คือเห็นได้ `emp own / mgr dept / hr all` ที่ `leave.service.js:47` ส่วน `Actionability` คือต้องทำ `isNeedsCheck(role)` ที่ `99` `emp:SU+Y (ต้องแก้) / mgr:DC|MA / hr:DC` แยกกันเพื่อไม่ให้ `emp` เห็น `MA` แล้วแดงมั่วครับ"
+*   **Answer EN:** "I split `Visibility` (`emp own / mgr dept / hr all` at `leave.service.js:47`) and `Actionability` (`isNeedsCheck` at `99` `emp:SU+Y / mgr:DC|MA / hr:DC`) so `emp` does not see `MA` as red."
+*   **ไฟล์:** `notification-bell.ts:99,135` `leave.service.js:47`
+*   **กับดัก:** "ทุกคนเห็น DC,MA แดง"
+
+### Q84: EEC ทำอะไร? ทำไมใช้ `DevExtreme` ไม่ใช้ `Ant Design` เหมือน PWA?
+
+*   **โค้ด:** `eec-oss-officer-api/src/EecOss.Officer.Api` 109 controllers `BetimesControllerBase.cs:12` `WebReportController.cs:503` `eec-oss-officer-ui` `DxDataGrid`
+*   **ถามไทย:** "EEC ทำอะไรครับ? ทำไมไม่ใช้ Ant เหมือนประปา?"
+*   **ตอบไทย (30 วิ):** "EEC ศูนย์บริการเบ็ดเสร็จ ` .NET6 XPO + Angular16 + Camunda BPM 192.168.38.6:8080` ผมทำ `Master SLA/Holiday + ElisService Token→Survey + Report 503 1000 บรรทัด` ครับ ใช้ `DevExtreme DataGrid` เพราะ `70+ ฟอร์ม FormIO 101-601` ต้องกริดหนัก ส่วน PWA ประปา 5 โมดูล `น้ำดิบ/ปั๊ม/มิเตอร์` ใช้ `React AntD` เบาแยก `Microservices` ครับ"
+*   **Answer EN:** "EEC is a one-stop service `.NET6 XPO + Angular16 + Camunda` I did `Master + Elis + Report:503` 1k lines. `DevExtreme` fits 70+ FormIO grids; PWA uses `Ant Design` light for 5 microservices."
+*   **ไฟล์:** `BetimesControllerBase.cs:12` `WebReportController.cs:503` `ทำความเข้าใจโปรเจ็ค.txt:18`
+*   **กับดัก:** "ออกแบบ Camunda เอง"
+
+### Q85: `XPO vs EF Core` ต่างกันยังไง? ทำไม PWA ใช้ EF?
+
+*   **โค้ด:** `Template.Api/EntitiesCode/SampleItem.cs:XPObject` `BetinesUntiOfWork.cs:8 UnitOfWork` vs `DbContext` `SaveChanges`
+*   **ถามไทย:** "ทำไม EEC ใช้ XPO แต่ประปาใช้ EF Core?"
+*   **ตอบไทย (30 วิ):** "XPO `class:XPObject + [Persistent] + UnitOfWork + CommitChanges()` ต่อ `Oracle/SQL/Mongo` ในตัว + `XpoModelBinder.cs:257` ผูกฟอร์มอัตโนมัติ เหมาะ EEC ที่ต้องต่อหลาย DB ฟอร์มเยอะครับ ส่วน EF Core `POCO + DbContext + SaveChanges()` มาตรฐาน `.NET8` สมัยใหม่ เหมาะ PWA `.NET8 MediatR CQRS` ที่แยก `Command/Query` ครับ"
+*   **Answer EN:** "XPO `XPObject + UnitOfWork + CommitChanges()` supports multi-DB + `XpoModelBinder`; `EF Core` `POCO + DbContext + SaveChanges()` is standard `.NET8` for `MediatR CQRS`."
+*   **ไฟล์:** `SampleItem.cs:XPObject` `BetinesUntiOfWork.cs:8` `ทำความเข้าใจโปรเจ็ค.txt:21-53`
+*   **กับดัก:** "XPO ใหม่กว่า EF"
+
+---
+
+> **ยืนยันเพิ่ม 29 ส.ค. 2026:** ส่วน 12-13 นี้ Append ต่อ Q75 ไม่ลบของเดิม | ไทย+อังกฤษคู่ อ่านง่าย 45 วิ | เปิดโค้ดตามเลขบรรทัดได้ทันที
+
