@@ -28,7 +28,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: 20.x                     # LTS as of 2026
+  NODE_VERSION: 22.x                     # sync กับ package.json engines 22.x — กัน npm ci engine mismatch
 
 jobs:
   # ──────────────────────────────────────────────────────────────
