@@ -5,9 +5,9 @@ const roleMiddleware = require('../middleware/role.middleware');
 module.exports = function (supabaseClient) {
   const router = Router();
 
-  // P0 Security: all debug routes require authenticated admin
+  // P0 Security: all debug routes require authenticated hr (seed has emp/mgr/hr only, no admin)
   router.use(authMiddleware);
-  router.use(roleMiddleware('admin'));
+  router.use(roleMiddleware('hr'));
 
   // GET /api/debug/constraint - dump current_status constraint + column info
   router.get('/constraint', async (req, res) => {
