@@ -73,10 +73,39 @@ app.set('db', db);
 
 app.use(auditLogMiddleware(db));
 
-// Serve uploads as static files
-// NOTE: /uploads static ใช้ได้แค่ local (diskStorage). บน Vercel ไฟล์อยู่ใน Supabase Storage (memoryStorage) — ไม่ได้เก็บใน filesystem
+// Serve uploads as static files — กันไฟล์หลุด: ต้อง auth + canAccess ก่อน (P0: ปิด public static)
+// บน Vercel (VERCEL=1) ไฟล์อยู่ Supabase Storage (memoryStorage) — ไม่ต้อง serve static เลย
+// บน local ต้องเช็คว่าไฟล์นั้นเป็นของ user จริงก่อนส่ง
 const { UPLOAD_PATH } = require('./middleware/upload.middleware');
-app.use('/uploads', express.static(path.resolve(UPLOAD_PATH)));
+if (!process.env.VERCEL) {
+  // local/dev: /uploads/:id/:filename ต้องผ่าน auth + check สิทธิ์ (กัน IDOR + public leak)
+  app.use('/uploads', authMiddleware, async (req, res, next) => {
+    try {
+      // req.path = /<leaveId>/<filename> — ดึง leaveId จาก path
+      const parts = req.path.split('/').filter(Boolean);
+      const leaveId = parts[0];
+      if (!leaveId) return res.status(400).json({ message: 'รหัสคำขอไม่ถูกต้อง' });
+      // reuse canAccess logic แบบ file.route.js:15 (owner/hr/mgr same department)
+      const dbRef = app.get('db');
+      const leave = await dbRef.getLeaveById(leaveId);
+      if (!leave) return res.status(404).json({ message: 'ไม่พบคำขอ' });
+      if (leave.user_id === req.user.id) return next();
+      if (req.user.role === 'hr') return next();
+      if (req.user.role === 'mgr') {
+        const mgr = await dbRef.findUserById(req.user.id);
+        const owner = await dbRef.findUserById(leave.user_id);
+        if (owner && mgr && owner.department === mgr.department) return next();
+      }
+      return res.status(403).json({ message: 'ไม่มีสิทธิ์เข้าถึงไฟล์นี้' });
+    } catch (e) {
+      console.error('[uploads static] auth check error', e.message);
+      return res.status(500).json({ message: 'เกิดข้อผิดพลาดตรวจสอบสิทธิ์' });
+    }
+  }, express.static(path.resolve(UPLOAD_PATH)));
+} else {
+  // Vercel: บล็อค /uploads static ทั้งหมด — ให้ใช้ GET /api/leave/:id/files/:fileId (createSignedUrl) เท่านั้น
+  app.use('/uploads', (req, res) => res.status(404).json({ message: 'ใช้ /api/leave/:id/files/:fileId แทน' }));
+}
 
 // Init services
 const authService = new AuthService(db);
