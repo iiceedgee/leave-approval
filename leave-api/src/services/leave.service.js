@@ -74,14 +74,16 @@ class LeaveService {
     return this.db.getLeaveById(id);
   }
 
-  // ★ อนุมัติ — ต้อง status MA และ role=mgr เท่านั้น (หัวหน้าคนเดียว)
+  // ★ อนุมัติ — ต้อง status MA และ role=mgr เท่านั้น (หัวหน้าคนเดียว) — กันชน 2 คนกดพร้อมกัน
   async approve(leaveId, userId, role, remark) {
     if (!leaveId || !userId) return { error: 'พารามิเตอร์ไม่ครบ' };
     if (role !== 'mgr') return { error: 'เฉพาะหัวหน้า (mgr) เท่านั้นที่อนุมัติได้' };
     const leave = await this.db.getLeaveById(leaveId);
     if (!leave) return { error: 'ไม่พบคำขอ' };
     if (leave.current_status !== STATUS.MA.code) return { error: 'ไม่สามารถอนุมัติได้ สถานะปัจจุบันไม่ใช่รอหัวหน้าตรวจสอบ (MA)' };
-    return this.transition(leaveId, userId, role, STATUS.AP.code, remark);
+    const res = await this.transition(leaveId, userId, role, STATUS.AP.code, remark, STATUS.MA.code);
+    if (res && res.statusCode === 409) return res;
+    return res;
   }
 
   // ★ ส่งกลับแก้ไข — DC ให้ hr/mgr, MA ให้ mgr คนเดียว (VC removed, but legacy VC still supported deprecated)
@@ -103,11 +105,27 @@ class LeaveService {
     if (leave.current_status === STATUS.MA.code && role !== 'mgr') return { error: 'เฉพาะหัวหน้าเท่านั้นที่ส่งกลับที่ MA ได้' };
     if (!remark || !String(remark).trim()) return { error: 'กรุณาระบุเหตุผลที่ส่งกลับ' };
 
-    const updated = await this.db.updateLeave(leaveId, {
+    // กันชน 2 คนกดพร้อมกัน: UPDATE WHERE current_status เท่านั้น — ถ้าโดนชิงไปแล้วจะได้ null → 409
+    const prevStatus = leave.current_status;
+    const where = isLegacyVC ? { current_status: 'VC' } : { current_status: prevStatus };
+    const updatePayload = {
       current_status: STATUS.SU.code,
       flag_send_back: 'Y',
       send_back_count: (leave.send_back_count || 0) + 1,
-    });
+    };
+    let updated = null;
+    if (typeof this.db.updateLeaveWhere === 'function') {
+      updated = await this.db.updateLeaveWhere(leaveId, updatePayload, where);
+      if (!updated) {
+        const fresh = await this.db.getLeaveById(leaveId);
+        if (fresh && fresh.current_status !== prevStatus) {
+          return { error: 'คำขอนี้ถูกดำเนินการไปแล้ว กรุณารีเฟรช', statusCode: 409 };
+        }
+        return { error: 'ไม่สามารถส่งกลับได้ สถานะปัจจุบันไม่รอการตรวจสอบ (DC/MA)' };
+      }
+    } else {
+      updated = await this.db.updateLeave(leaveId, updatePayload);
+    }
 
     await this.db.addHistory({
       leave_request_id: leaveId,
@@ -120,7 +138,7 @@ class LeaveService {
     return updated;
   }
 
-  // ★ ไม่อนุมัติ — DC ให้ hr/mgr, MA ให้ mgr คนเดียว (VC removed)
+  // ★ ไม่อนุมัติ — DC ให้ hr/mgr, MA ให้ mgr คนเดียว (VC removed) — กันชน 2 คนกดพร้อมกัน
   async reject(leaveId, userId, role, remark) {
     if (!leaveId || !userId) return { error: 'พารามิเตอร์ไม่ครบ' };
     const leave = await this.db.getLeaveById(leaveId);
@@ -137,7 +155,11 @@ class LeaveService {
     }
     if (leave.current_status === STATUS.MA.code && role !== 'mgr') return { error: 'เฉพาะหัวหน้าเท่านั้นที่ไม่อนุมัติที่ MA ได้' };
     if (!remark || !String(remark).trim()) return { error: 'กรุณาระบุเหตุผลที่ไม่อนุมัติ' };
-    return this.transition(leaveId, userId, role, STATUS.RJ.code, remark);
+    // กันชน: transition แบบ WHERE status เดิม — ถ้าโดนชิงไปแล้วจะได้ 409
+    const res = await this.transition(leaveId, userId, role, STATUS.RJ.code, remark, leave.current_status);
+    if (res && res.statusCode === 409) return res;
+    if (res && res.error) return res;
+    return res;
   }
 
   // ★ ยกเลิก — เฉพาะ status SU
@@ -209,13 +231,27 @@ class LeaveService {
     return updated;
   }
 
-  // logic กลางสำหรับเปลี่ยน status + บันทึก history
-  async transition(leaveId, userId, role, targetStatus, remark) {
+  // logic กลางสำหรับเปลี่ยน status + บันทึก history — กันชน 2 คนกดพร้อมกันด้วย WHERE status เดิม
+  async transition(leaveId, userId, role, targetStatus, remark, expectedStatus) {
     if (!leaveId || !userId || !targetStatus) return null;
     const leave = await this.db.getLeaveById(leaveId);
     if (!leave) return null;
 
-    const updated = await this.db.updateLeave(leaveId, { current_status: targetStatus });
+    // ถ้ามี expectedStatus ให้ใช้ atomic WHERE กัน 2 tab/2 คนกดพร้อมกัน
+    const whereStatus = expectedStatus || leave.current_status;
+    let updated = null;
+    if (typeof this.db.updateLeaveWhere === 'function' && whereStatus) {
+      updated = await this.db.updateLeaveWhere(leaveId, { current_status: targetStatus }, { current_status: whereStatus });
+      if (!updated) {
+        const fresh = await this.db.getLeaveById(leaveId);
+        if (fresh && fresh.current_status !== whereStatus) {
+          return { error: 'คำขอนี้ถูกดำเนินการไปแล้ว กรุณารีเฟรช', statusCode: 409 };
+        }
+        return { error: 'ไม่สามารถเปลี่ยนสถานะได้ สถานะปัจจุบันไม่ใช่ค่าที่คาดไว้' };
+      }
+    } else {
+      updated = await this.db.updateLeave(leaveId, { current_status: targetStatus });
+    }
 
     await this.db.addHistory({
       leave_request_id: leaveId,

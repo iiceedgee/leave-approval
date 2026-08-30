@@ -12,7 +12,10 @@ module.exports = function (leaveService) {
 
   function handleResult(leave, res) {
     if (!leave) return res.status(404).json({ message: 'ไม่พบคำขอ' });
-    if (leave.error) return res.status(400).json({ message: leave.error });
+    if (leave.error) {
+      const code = leave.statusCode === 409 ? 409 : 400;
+      return res.status(code).json({ message: leave.error });
+    }
     res.json(leave);
   }
 

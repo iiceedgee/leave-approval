@@ -19,8 +19,20 @@ class DocumentService {
     if (leave.current_status !== STATUS.DC.code) return { error: 'ไม่สามารถตรวจสอบความครบถ้วนได้ สถานะปัจจุบันไม่ใช่รอตรวจสอบเอกสาร (DC)' };
     if (!['hr', 'mgr'].includes(role)) return { error: 'ไม่มีสิทธิ์ดำเนินการ' };
 
-    // Simplified: DC directly to MA (no VC intermediate)
-    const updated = await this.db.updateLeave(leaveId, { current_status: STATUS.MA.code });
+    // กันชน 2 คนกดพร้อมกัน: DC -> MA แบบ WHERE DC เท่านั้น
+    let updated = null;
+    if (typeof this.db.updateLeaveWhere === 'function') {
+      updated = await this.db.updateLeaveWhere(leaveId, { current_status: STATUS.MA.code }, { current_status: STATUS.DC.code });
+      if (!updated) {
+        const fresh = await this.db.getLeaveById(leaveId);
+        if (fresh && fresh.current_status !== STATUS.DC.code) {
+          return { error: 'คำขอนี้ถูกดำเนินการไปแล้ว กรุณารีเฟรช', statusCode: 409 };
+        }
+        return { error: 'ไม่สามารถตรวจสอบความครบถ้วนได้ สถานะปัจจุบันไม่ใช่รอตรวจสอบเอกสาร (DC)' };
+      }
+    } else {
+      updated = await this.db.updateLeave(leaveId, { current_status: STATUS.MA.code });
+    }
     await this._addVerification(leaveId, 'pretemp', 'pass', userId, role, remark);
     await this._addHistory(leaveId, STATUS.MA.code, userId, role, remark || 'ผ่านการตรวจสอบความครบถ้วน — ส่งต่อรอหัวหน้าอนุมัติ');
     return updated;
@@ -34,11 +46,25 @@ class DocumentService {
     if (!['hr', 'mgr'].includes(role)) return { error: 'ไม่มีสิทธิ์ดำเนินการ' };
     if (!remark || !String(remark).trim()) return { error: 'กรุณาระบุเหตุผลที่ส่งกลับ' };
 
-    const updated = await this.db.updateLeave(leaveId, {
+    // กันชน 2 คนกดพร้อมกัน: DC -> SU+Y แบบ WHERE DC
+    const payload = {
       current_status: STATUS.SU.code,
       flag_send_back: 'Y',
       send_back_count: (leave.send_back_count || 0) + 1,
-    });
+    };
+    let updated = null;
+    if (typeof this.db.updateLeaveWhere === 'function') {
+      updated = await this.db.updateLeaveWhere(leaveId, payload, { current_status: STATUS.DC.code });
+      if (!updated) {
+        const fresh = await this.db.getLeaveById(leaveId);
+        if (fresh && fresh.current_status !== STATUS.DC.code) {
+          return { error: 'คำขอนี้ถูกดำเนินการไปแล้ว กรุณารีเฟรช', statusCode: 409 };
+        }
+        return { error: 'ไม่สามารถส่งกลับได้ สถานะปัจจุบันไม่ใช่รอตรวจสอบเอกสาร (DC)' };
+      }
+    } else {
+      updated = await this.db.updateLeave(leaveId, payload);
+    }
     await this._addVerification(leaveId, 'pretemp', 'sendback', userId, role, remark);
     await this._addHistory(leaveId, STATUS.SB.code, userId, role, remark || 'ส่งกลับแก้ไขเอกสาร');
     return updated;
