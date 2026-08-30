@@ -8,6 +8,30 @@ function validateId(req, res, next) {
   next();
 }
 
+/**
+ * canAccessLeave — กัน IDOR สำหรับ GET /:id, /:id/stepper, /:id/history
+ * emp: เจ้าของเท่านั้น, hr: ทั้งหมด, mgr: เฉพาะ department เดียวกัน
+ * ใช้ logic เดียวกับ file.route.js:15 เพื่อไม่ให้ drift
+ */
+async function canAccessLeave(db, leaveId, user) {
+  if (!leaveId || !user || !user.id) return null;
+  try {
+    const leave = await db.getLeaveById(leaveId);
+    if (!leave) return null;
+    if (leave.user_id === user.id) return leave;
+    if (user.role === 'hr') return leave;
+    if (user.role === 'mgr') {
+      const mgr = await db.findUserById(user.id);
+      const owner = await db.findUserById(leave.user_id);
+      if (owner && mgr && owner.department === mgr.department) return leave;
+    }
+    return null;
+  } catch (e) {
+    console.error('[leave.route] canAccessLeave error', e.message);
+    return null;
+  }
+}
+
 module.exports = function (leaveService, fileService) {
   const router = Router();
 
@@ -41,12 +65,17 @@ module.exports = function (leaveService, fileService) {
     try { const leave = await leaveService.create(req.user.id, req.body); res.status(201).json(leave); } catch(err){ next(err); }
   });
 
-  // GET /api/leave/:id — ดูรายละเอียดคำขอ (ต้องอยู่ท้ายสุดของ GET routes)
+  // GET /api/leave/:id — ดูรายละเอียดคำขอ (กัน IDOR: เช็คสิทธิ์ก่อนส่งข้อมูล)
   router.get('/:id', validateId, async (req, res, next) => {
     try {
       const id = req.params.id;
-      const leave = await leaveService.getById(id);
-      if (!leave) return res.status(404).json({ message: 'ไม่พบคำขอ' });
+      const leave = await canAccessLeave(leaveService.db, id, req.user);
+      if (!leave) {
+        // แยก 404 vs 403 — ถ้าแถวมีจริงแต่ไม่มีสิทธิ์ให้ 403 เพื่อกัน enumerate
+        const exists = await leaveService.getById(id);
+        if (exists) return res.status(403).json({ message: 'ไม่มีสิทธิ์เข้าถึงคำขอนี้' });
+        return res.status(404).json({ message: 'ไม่พบคำขอ' });
+      }
       res.json(leave);
     } catch(err){ next(err); }
   });
@@ -152,19 +181,29 @@ module.exports = function (leaveService, fileService) {
     } catch(err){ next(err); }
   });
 
-  // GET /api/leave/:id/stepper — ★ ดึง stepper steps
+  // GET /api/leave/:id/stepper — ★ ดึง stepper steps (กัน IDOR)
   router.get('/:id/stepper', validateId, async (req, res, next) => {
     try {
       const id = req.params.id;
+      if (!(await canAccessLeave(leaveService.db, id, req.user))) {
+        const exists = await leaveService.getById(id);
+        if (exists) return res.status(403).json({ message: 'ไม่มีสิทธิ์เข้าถึงคำขอนี้' });
+        return res.status(404).json({ message: 'ไม่พบคำขอ' });
+      }
       const steps = await leaveService.getStepper(id);
       res.json(steps);
     } catch(err){ next(err); }
   });
 
-  // GET /api/leave/:id/history — ★ ดึงประวัติการเปลี่ยนแปลง
+  // GET /api/leave/:id/history — ★ ดึงประวัติการเปลี่ยนแปลง (กัน IDOR)
   router.get('/:id/history', validateId, async (req, res, next) => {
     try {
       const id = req.params.id;
+      if (!(await canAccessLeave(leaveService.db, id, req.user))) {
+        const exists = await leaveService.getById(id);
+        if (exists) return res.status(403).json({ message: 'ไม่มีสิทธิ์เข้าถึงคำขอนี้' });
+        return res.status(404).json({ message: 'ไม่พบคำขอ' });
+      }
       const history = await leaveService.getHistory(id);
       res.json(history);
     } catch(err){ next(err); }
