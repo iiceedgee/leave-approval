@@ -1078,5 +1078,38 @@ hr       | all  + DC เท่านั้น       | DC แดง              
 
 ---
 
+### Q86: `GET /leave/:id` ทำไม `emp02` ดูใบลา `emp01` ได้? (IDOR)
+
+*   **โค้ด:** `leave.route.js:69 GET /:id, 184 stepper, 198 history` `file.route.js:15 canAccessLeave` `supabase-store.js:32 seed`
+*   **ถามไทย:** "พี่ลอง `curl GET /api/leave/<id ของคนอื่น>` ด้วย `emp02` แล้วได้ `200` ทำไม?"
+*   **ตอบไทย (30 วิ):** "บั๊กผมครับ `leave.route.js:45` เดิม `getById` อย่างเดียว ไม่เช็คเจ้าของ `emp02` ยิง `id` `emp01` ได้เลย `IDOR` ครับ แก้ด้วย `canAccessLeave` ที่ `11-33` ตรวจ `owner || hr || mgr same department` แบบ `file.route.js:15` ก่อนส่ง ถ้าไม่ใช่ให้ `403` ถ้าไม่มีแถวให้ `404` กัน enumerate ตอนนี้ `GET /:id + /stepper + /history` กันครบแล้วครับ"
+*   **Answer EN:** "Bug: `leave.route.js:45` only did `getById` without ownership check — `emp02` could GET `emp01`'s leave (`IDOR`). Fixed with `canAccessLeave` at `11-33` (`owner || hr || mgr same dept` like `file.route.js:15`) returning `403` if unauthorized, `404` if not found, for `/:id, /stepper, /history`."
+*   **ไฟล์:** `leave.route.js:11 canAccessLeave, 69 GET /:id, 184 stepper, 198 history`
+*   **กับดัก:** "filter ที่ `GET /leave` พอแล้ว" / "stepper/history ไม่ต้องกัน"
+
+---
+
+### Q87: `GET /uploads/...` ทำไมไม่ต้อง login ก็โหลดไฟล์ได้?
+
+*   **โค้ด:** `app.js:76 express.static('/uploads')` `file.route.js:213 signedUrl` `supabase storage leave-documents`
+*   **ถามไทย:** "พี่ `curl /uploads/abc/file.pdf` ไม่ใส่ token แล้วโหลดได้ ทำไม?"
+*   **ตอบไทย (30 วิ):** "ผม mount `express.static('/uploads')` ที่ `app.js:79` ก่อน `auth` เลย public ครับ บน local `diskStorage` ใครรู้ path ก็โหลดได้ แก้เป็น `app.js:76` local ต้อง `authMiddleware + canAccess (owner/hr/mgr dept)` ก่อน `static` ส่วน `VERCEL=1` บล็อค `/uploads` ทั้งหมด ให้ใช้ `GET /api/leave/:id/files/:fileId` ที่ `file.route.js:213` สร้าง `Supabase createSignedUrl` แทนครับ"
+*   **Answer EN:** "I mounted `express.static('/uploads')` at `app.js:79` before `auth`, so it was public. Fixed at `app.js:76`: local now requires `authMiddleware + owner/hr/mgr dept` before `static`; on `VERCEL` `/uploads` returns `404` and clients must use `GET /:id/files/:fileId` which creates a `Supabase signedUrl` at `file.route.js:213`."
+*   **ไฟล์:** `app.js:76 /uploads auth guard` `file.route.js:213 signedUrl`
+*   **กับดัก:** "`static` ปลอดภัยอยู่แล้ว" / "เพิ่ม `VERCEL_UPLOADS` พอ"
+
+---
+
+### Q88: 2 หัวหน้ากด `อนุมัติ` พร้อมกัน ทำไมได้ทั้งคู่?
+
+*   **โค้ด:** `leave.service.js:84 approve, 88 sendBack, 124 reject, 213 transition, document.service.js:15 pretempPass, 29 pretempSendBack` `supabase-store.js:240 updateLeaveWhere` `approval.route.js:13` `document.route.js:5` `409`
+*   **ถามไทย:** "2 หัวหน้าเปิดใบเดียวกัน `MA` กด `อนุมัติ` พร้อมกัน `09:00:00.001` จะเกิดอะไร?"
+*   **ตอบไทย (30 วิ):** "เดิม `transition:218` ใช้ `updateLeave` ธรรมดา อ่าน `MA` ทั้งคู่ ผ่าน Gate ทั้งคู่ เขียน `AP` ทับกันได้ครับ แก้เป็น `updateLeaveWhere WHERE current_status='MA' RETURNING` ที่ `supabase-store.js:240` แบบ `resubmit:182` ทำแล้ว `Tab แรกได้แถว Tab สองได้ null → 409 Conflict ถูกดำเนินการไปแล้ว` ทำครบ `approve/sendBack/reject/pretempPass/pretempSendBack` + `handleResult:13` ส่ง `409` ให้ FE `toast + refresh` ครับ"
+*   **Answer EN:** "Before, `transition:218` used plain `updateLeave` — two `mgr`s both read `MA`, passed the gate, and overwrote to `AP`. Fixed with `updateLeaveWhere WHERE current_status='MA' RETURNING` at `supabase-store.js:240` (like `resubmit:182`); first succeeds, second gets `null → 409 Conflict`. Applied to `approve/sendBack/reject/pretempPass/pretempSendBack` and `approval.route.js:13` returns `409`."
+*   **ไฟล์:** `leave.service.js:84,88,124,213` `document.service.js:15,29` `supabase-store.js:240` `approval.route.js:13 409`
+*   **กับดัก:** "มี Gate พอแล้วไม่ต้อง WHERE" / "ใส่ transaction พอ"
+
+---
+
 > **ยืนยันเพิ่ม 29 ส.ค. 2026:** ส่วน 12-13 นี้ Append ต่อ Q75 ไม่ลบของเดิม | ไทย+อังกฤษคู่ อ่านง่าย 45 วิ | เปิดโค้ดตามเลขบรรทัดได้ทันที
 
