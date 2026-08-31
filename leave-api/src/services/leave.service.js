@@ -44,7 +44,7 @@ class LeaveService {
   }
 
   // ดึง leaves ตาม role — manager เห็นของลูกทีม, HR เห็นทั้งหมด
-  async getLeaves(userId, role) {
+  async getLeaves(userId, role, { page, limit } = {}) {
     const allLeaves = await this.db.listLeaves();
     const allUsers = await this.db.listUsers();
     const nameMap = new Map(allUsers.map(u => [u.id, u.full_name]));
@@ -55,18 +55,28 @@ class LeaveService {
     } else if (role === 'mgr') {
       // manager เห็น leaves ของ employees ใน department เดียวกัน
       const mgr = allUsers.find(u => u.id === userId);
-      if (!mgr) return [];
-      leaves = allLeaves.filter(l => {
-        const u = allUsers.find(x => x.id === l.user_id);
-        return u && u.department === mgr.department;
-      });
+      if (!mgr) {
+        leaves = [];
+      } else {
+        leaves = allLeaves.filter(l => {
+          const u = allUsers.find(x => x.id === l.user_id);
+          return u && u.department === mgr.department;
+        });
+      }
     } else {
       // employee เห็นเฉพาะของตัวเอง
       leaves = allLeaves.filter(l => l.user_id === userId);
     }
 
     // เพิ่มชื่อเจ้าของคำขอ (owner_name) — เรียงจาก DB แล้ว (updated_at DESC) ไม่ต้อง sort ซ้ำ
-    return leaves.map(l => ({ ...l, owner_name: nameMap.get(l.user_id) || l.user_id }));
+    const mapped = leaves.map(l => ({ ...l, owner_name: nameMap.get(l.user_id) || l.user_id }));
+    // backward compat: ถ้าไม่มี page/limit ให้ return array เหมือนเดิม (กัน null ด้วย)
+    if (page == null && limit == null) return mapped;
+    const p = Math.max(1, parseInt(page) || 1);
+    const l = Math.min(50, Math.max(1, parseInt(limit) || 10));
+    const total = mapped.length;
+    const data = mapped.slice((p - 1) * l, p * l);
+    return { data, total, page: p, limit: l, totalPages: Math.ceil(total / l) };
   }
 
   async getById(id) {
@@ -307,17 +317,24 @@ class LeaveService {
   }
 
   // ★ ดึงประวัติการลาของพนักงานตามปี
-  async getMyHistory(userId, year) {
+  async getMyHistory(userId, year, { page, limit } = {}) {
     if (!userId) return [];
     const targetYear = year || new Date().getFullYear();
     const allLeaves = await this.db.listLeaves();
-    return allLeaves
+    const filtered = allLeaves
       .filter(l => l.user_id === userId && new Date(l.start_date).getFullYear() === targetYear)
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
       .map(l => ({
         ...l,
         used_days: LeaveService.calcLeaveDays(l.start_date, l.end_date),
       }));
+    // backward compat: ถ้าไม่มี page/limit ให้ return array เหมือนเดิม (กัน null ด้วย)
+    if (page == null && limit == null) return filtered;
+    const p = Math.max(1, parseInt(page) || 1);
+    const l = Math.min(50, Math.max(1, parseInt(limit) || 10));
+    const total = filtered.length;
+    const data = filtered.slice((p - 1) * l, p * l);
+    return { data, total, page: p, limit: l, totalPages: Math.ceil(total / l) };
   }
 
   // ★ ดึงยอดคงเหลือการลาของพนักงานตามปี

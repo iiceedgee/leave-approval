@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { Leave, CreateLeaveRequest, HistoryItem, UploadedFile, LeaveBalance, LeaveHistoryItem } from '../models/leave.model';
 import { StepperStep, TimelineItem } from '../models/stepper.model';
@@ -11,8 +11,19 @@ export class LeaveService {
 
   constructor(private http: HttpClient) {}
 
-  getLeaves(): Observable<Leave[]> {
-    return this.http.get<Leave[]>(`${this.apiUrl}/leave`);
+  getLeaves(): Observable<Leave[]>;
+  getLeaves(page: number, limit: number): Observable<Leave[] | { data: Leave[]; total: number; page: number; limit: number; totalPages: number }>;
+  getLeaves(page?: number, limit?: number): Observable<Leave[] | { data: Leave[]; total: number; page: number; limit: number; totalPages: number }> {
+    if (page == null || limit == null) {
+      return this.http.get<Leave[]>(`${this.apiUrl}/leave`);
+    }
+    const params = new HttpParams()
+      .set('page', String(page))
+      .set('limit', String(limit));
+    return this.http.get<{ data: Leave[]; total: number; page: number; limit: number; totalPages: number }>(
+      `${this.apiUrl}/leave`,
+      { params }
+    );
   }
 
   getLeave(id: string): Observable<Leave> {
@@ -62,8 +73,20 @@ export class LeaveService {
 
   // ── My History & Balance ──
 
-  getMyHistory(year: number): Observable<LeaveHistoryItem[]> {
-    return this.http.get<LeaveHistoryItem[]>(`${this.apiUrl}/leave/my-history?year=${year}`);
+  getMyHistory(year: number): Observable<LeaveHistoryItem[]>;
+  getMyHistory(year: number, page: number, limit: number): Observable<LeaveHistoryItem[] | { data: LeaveHistoryItem[]; total: number; page: number; limit: number; totalPages: number }>;
+  getMyHistory(year: number, page?: number, limit?: number): Observable<LeaveHistoryItem[] | { data: LeaveHistoryItem[]; total: number; page: number; limit: number; totalPages: number }> {
+    if (page == null || limit == null) {
+      return this.http.get<LeaveHistoryItem[]>(`${this.apiUrl}/leave/my-history?year=${year}`);
+    }
+    const params = new HttpParams()
+      .set('year', String(year))
+      .set('page', String(page))
+      .set('limit', String(limit));
+    return this.http.get<{ data: LeaveHistoryItem[]; total: number; page: number; limit: number; totalPages: number }>(
+      `${this.apiUrl}/leave/my-history`,
+      { params }
+    );
   }
 
   getMyBalance(year: number): Observable<LeaveBalance[]> {

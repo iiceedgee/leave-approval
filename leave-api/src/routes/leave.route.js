@@ -41,8 +41,12 @@ module.exports = function (leaveService, fileService) {
   router.get('/my-history', async (req, res, next) => {
     try {
       const year = parseInt(req.query.year) || new Date().getFullYear();
-      const history = await leaveService.getMyHistory(req.user.id, year);
-      res.json(history);
+      const page = req.query.page !== undefined ? parseInt(req.query.page, 10) : undefined;
+      const limit = req.query.limit !== undefined ? parseInt(req.query.limit, 10) : undefined;
+      if (page !== undefined && (isNaN(page) || page < 1)) return res.status(400).json({ message: 'page ต้องเป็นตัวเลข >= 1' });
+      if (limit !== undefined && (isNaN(limit) || limit < 1 || limit > 50)) return res.status(400).json({ message: 'limit ต้องเป็นตัวเลข 1-50' });
+      const result = await leaveService.getMyHistory(req.user.id, year, { page, limit });
+      return res.json(result);
     } catch (err) { next(err); }
   });
 
@@ -57,7 +61,14 @@ module.exports = function (leaveService, fileService) {
 
   // GET /api/leave — ดึงรายการคำขอลาตาม role
   router.get('/', async (req, res, next) => {
-    try { const leaves = await leaveService.getLeaves(req.user.id, req.user.role); res.json(leaves); } catch(err){ next(err); }
+    try {
+      const page = req.query.page !== undefined ? parseInt(req.query.page, 10) : undefined;
+      const limit = req.query.limit !== undefined ? parseInt(req.query.limit, 10) : undefined;
+      if (page !== undefined && (isNaN(page) || page < 1)) return res.status(400).json({ message: 'page ต้องเป็นตัวเลข >= 1' });
+      if (limit !== undefined && (isNaN(limit) || limit < 1 || limit > 50)) return res.status(400).json({ message: 'limit ต้องเป็นตัวเลข 1-50' });
+      const r = await leaveService.getLeaves(req.user.id, req.user.role, { page, limit });
+      return res.json(r);
+    } catch(err){ next(err); }
   });
 
   // POST /api/leave — พนักงานยื่นคำขอลา

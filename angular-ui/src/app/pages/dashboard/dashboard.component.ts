@@ -18,6 +18,12 @@ export class DashboardComponent implements OnInit, OnDestroy {
   loading = true;
   private destroy$ = new Subject<void>();
 
+  // ── Pagination state (backward compat: defaults keep client paging working) ──
+  page = 1;
+  limit = 10;
+  total = 0;
+  totalPages = 0;
+
   readonly roleLabels: Record<string, string> = { emp: 'พนักงาน', mgr: 'หัวหน้า', hr: 'HR' };
 
   constructor(
@@ -32,13 +38,57 @@ export class DashboardComponent implements OnInit, OnDestroy {
     } catch {
       this.user = null;
     }
-    this.leaveService.getLeaves().pipe(takeUntil(this.destroy$)).subscribe({
-      next: (data) => {
-        this.leaves = Array.isArray(data) ? data : [];
+    this.loadLeaves();
+  }
+
+  loadLeaves(): void {
+    this.loading = true;
+    this.leaveService.getLeaves(this.page, this.limit).pipe(takeUntil(this.destroy$)).subscribe({
+      next: (res) => {
+        if (Array.isArray(res)) {
+          // backward compat: backend ยังส่ง array เดิม
+          this.leaves = res;
+          this.total = res.length;
+          this.totalPages = Math.ceil(this.total / this.limit) || 1;
+        } else {
+          // paginated shape: { data, total, page, limit, totalPages }
+          const paginated = res as { data: Leave[]; total: number; page: number; limit: number; totalPages: number };
+          this.leaves = Array.isArray(paginated.data) ? paginated.data : [];
+          this.total = typeof paginated.total === 'number' ? paginated.total : this.leaves.length;
+          this.page = typeof paginated.page === 'number' ? paginated.page : this.page;
+          this.limit = typeof paginated.limit === 'number' ? paginated.limit : this.limit;
+          this.totalPages = typeof paginated.totalPages === 'number' ? paginated.totalPages : (Math.ceil(this.total / this.limit) || 1);
+        }
         this.loading = false;
       },
       error: () => { this.leaves = []; this.loading = false; }
     });
+  }
+
+  onPageChange(page: number): void {
+    if (!page || page < 1) return;
+    if (this.totalPages > 0 && page > this.totalPages) return;
+    this.page = page;
+    this.loadLeaves();
+  }
+
+  onPageSizeChange(limit: number): void {
+    if (!limit || limit < 1) return;
+    this.limit = limit;
+    this.page = 1;
+    this.loadLeaves();
+  }
+
+  onGridOptionChanged(e: any): void {
+    if (!e || !e.fullName) return;
+    if (e.fullName === 'paging.pageIndex') {
+      const newPage = (typeof e.value === 'number' ? e.value : 0) + 1;
+      if (newPage !== this.page) this.onPageChange(newPage);
+    }
+    if (e.fullName === 'paging.pageSize') {
+      const newSize = typeof e.value === 'number' ? e.value : this.limit;
+      if (newSize !== this.limit) this.onPageSizeChange(newSize);
+    }
   }
 
   ngOnDestroy(): void {

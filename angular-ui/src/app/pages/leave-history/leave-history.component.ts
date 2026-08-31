@@ -24,6 +24,12 @@ export class LeaveHistoryComponent implements OnInit {
   loading = true;
   errorMessage = '';
 
+  // ── Pagination state (backward compat: keep client paging if API returns array) ──
+  page = 1;
+  limit = 10;
+  total = 0;
+  totalPages = 0;
+
   readonly STATUS_LABELS: Record<string, string> = STATUS_LABELS;
 
   readonly toBuddhistYear = toBuddhistYear;
@@ -45,11 +51,23 @@ export class LeaveHistoryComponent implements OnInit {
     this.errorMessage = '';
     forkJoin([
       this.leaveService.getMyBalance(this.selectedYear),
-      this.leaveService.getMyHistory(this.selectedYear),
+      this.leaveService.getMyHistory(this.selectedYear, this.page, this.limit),
     ]).subscribe({
-      next: ([balances, history]) => {
+      next: ([balances, historyRes]) => {
         this.balances = Array.isArray(balances) ? balances : [];
-        this.history = Array.isArray(history) ? history : [];
+        if (Array.isArray(historyRes)) {
+          // backward compat: backend ยังส่ง array
+          this.history = historyRes;
+          this.total = historyRes.length;
+          this.totalPages = Math.ceil(this.total / this.limit) || 1;
+        } else {
+          const paginated = historyRes as { data: LeaveHistoryItem[]; total: number; page: number; limit: number; totalPages: number };
+          this.history = Array.isArray(paginated.data) ? paginated.data : [];
+          this.total = typeof paginated.total === 'number' ? paginated.total : this.history.length;
+          this.page = typeof paginated.page === 'number' ? paginated.page : this.page;
+          this.limit = typeof paginated.limit === 'number' ? paginated.limit : this.limit;
+          this.totalPages = typeof paginated.totalPages === 'number' ? paginated.totalPages : (Math.ceil(this.total / this.limit) || 1);
+        }
         this.loading = false;
       },
       error: () => {
@@ -59,6 +77,32 @@ export class LeaveHistoryComponent implements OnInit {
         this.errorMessage = 'ไม่สามารถโหลดข้อมูลได้ กรุณาลองอีกครั้ง';
       },
     });
+  }
+
+  onPageChange(page: number): void {
+    if (!page || page < 1) return;
+    if (this.totalPages > 0 && page > this.totalPages) return;
+    this.page = page;
+    this.loadData();
+  }
+
+  onPageSizeChange(limit: number): void {
+    if (!limit || limit < 1) return;
+    this.limit = limit;
+    this.page = 1;
+    this.loadData();
+  }
+
+  onGridOptionChanged(e: any): void {
+    if (!e || !e.fullName) return;
+    if (e.fullName === 'paging.pageIndex') {
+      const newPage = (typeof e.value === 'number' ? e.value : 0) + 1;
+      if (newPage !== this.page) this.onPageChange(newPage);
+    }
+    if (e.fullName === 'paging.pageSize') {
+      const newSize = typeof e.value === 'number' ? e.value : this.limit;
+      if (newSize !== this.limit) this.onPageSizeChange(newSize);
+    }
   }
 
   getStatusLabel(code: string): string {
@@ -85,6 +129,7 @@ export class LeaveHistoryComponent implements OnInit {
   }
 
   onYearChange(): void {
+    this.page = 1;
     this.loadData();
   }
 

@@ -18,11 +18,12 @@
   <div class="loading" *ngIf="loading">กำลังโหลด...</div>
 
   <dx-data-grid *ngIf="!loading" [dataSource]="leaves" [showBorders]="true" [columnAutoWidth]="true"
-    [rowAlternationEnabled]="true" [hoverStateEnabled]="true" noDataText="ไม่มีรายการ">
-    <dxo-paging [pageSize]="10"></dxo-paging>
+    [rowAlternationEnabled]="true" [hoverStateEnabled]="true" noDataText="ไม่มีรายการ"
+    (onOptionChanged)="onGridOptionChanged($event)">
+    <dxo-paging [pageSize]="limit" [pageIndex]="page - 1"></dxo-paging>
     <dxo-editing [allowAdding]="false" [allowDeleting]="false" [allowUpdating]="false"></dxo-editing>
     <dxo-pager [showPageSizeSelector]="true" [allowedPageSizes]="[10, 20, 50]" [showInfo]="true"
-      [showNavigationButtons]="true"></dxo-pager>
+      [showNavigationButtons]="true" [visible]="true" infoText="หน้า {0} จาก {1} ({2} รายการ)"></dxo-pager>
     <dxo-sorting mode="single"></dxo-sorting>
     <dxo-search-panel [visible]="true" [width]="240" placeholder="ค้นหา..."></dxo-search-panel>
 
