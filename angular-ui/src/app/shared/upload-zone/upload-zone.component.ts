@@ -23,6 +23,7 @@ export class UploadZoneComponent implements OnInit, OnDestroy, OnChanges {
   @Input() deleteFn?: (fileId: string) => Observable<any>;
   @Input() canDelete: boolean | ((file: UploadedFile) => boolean) = true;
   @Input() queueOnly = false;
+  @Input() disabled = false;
   @Output() uploadComplete = new EventEmitter<File[]>();
 
   @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
@@ -74,16 +75,19 @@ export class UploadZoneComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   onDragOver(event: DragEvent): void {
+    if (this.disabled) return;
     event.preventDefault();
     this.isDragging = true;
   }
 
   onDragLeave(event: DragEvent): void {
+    if (this.disabled) return;
     event.preventDefault();
     this.isDragging = false;
   }
 
   onDrop(event: DragEvent): void {
+    if (this.disabled) return;
     event.preventDefault();
     this.isDragging = false;
     if (!this.canAddMore) {
@@ -96,6 +100,7 @@ export class UploadZoneComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   onFileSelect(event: Event): void {
+    if (this.disabled) return;
     const input = event.target as HTMLInputElement;
     if (!this.canAddMore) {
       this.toast.warning('ครบ 5 ไฟล์แล้ว ลบไฟล์เดิมก่อน');
@@ -109,6 +114,7 @@ export class UploadZoneComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   private addFiles(files: File[]): void {
+    if (this.disabled) return;
     const occupied = this.pendingFiles.length + this.existingFileList.length;
     const remaining = Math.max(0, this.maxFiles - occupied);
     const toAdd = files.slice(0, remaining);
@@ -261,6 +267,7 @@ export class UploadZoneComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   canDeleteFile(file: UploadedFile): boolean {
+    if (this.disabled) return false;
     if (typeof this.canDelete === 'function') {
       return (this.canDelete as (f: UploadedFile) => boolean)(file);
     }
@@ -274,7 +281,17 @@ export class UploadZoneComponent implements OnInit, OnDestroy, OnChanges {
     return n + ' B';
   }
 
+  triggerFileInput(): void {
+    if (this.disabled || !this.canAddMore) return;
+    try {
+      this.fileInput?.nativeElement?.click();
+    } catch (e) {
+      console.error('[upload-zone] triggerFileInput failed', (e as Error).message);
+    }
+  }
+
   deleteFile(fileId: string): void {
+    if (this.disabled) return;
     const fn = this.deleteFn || ((fid: string) => this.leaveService.deleteFile(this.leaveId, fid));
     fn(fileId).pipe(takeUntil(this.destroy$)).subscribe({
       next: () => {
@@ -286,6 +303,7 @@ export class UploadZoneComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   async uploadAll(): Promise<void> {
+    if (this.disabled) return;
     if (this.uploading) return;
     if (this.pendingFiles.length === 0) {
       this.toast.warning('กรุณาเลือกไฟล์ก่อนอัปโหลด');

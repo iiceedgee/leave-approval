@@ -44,10 +44,12 @@ module.exports = function (fileService) {
           return res.status(403).json({ message: 'ไม่มีสิทธิ์เข้าถึง' });
         }
 
-        // Simplified flow: verification upload only at DC (pretemp) — VC removed
-        if (leave.current_status !== STATUS.DC.code) {
-          return res.status(400).json({ message: 'สถานะไม่สามารถอัปโหลดไฟล์ได้ (ต้องเป็น DC)' });
+        // DC view-only — HR/MGR ดูได้อย่างเดียว ห้ามแนบเพิ่ม (LOCK)
+        if (leave.current_status === STATUS.DC.code) {
+          return res.status(403).json({ message: 'สถานะรอตรวจสอบเอกสาร ไม่สามารถแนบเพิ่มได้ (view-only)' });
         }
+        // Verification uploads disabled at all statuses after DC view-only change
+        return res.status(403).json({ message: 'สถานะรอตรวจสอบเอกสาร ไม่สามารถแนบเพิ่มได้ (view-only)' });
 
         if (!req.files || req.files.length === 0) {
           return res.status(400).json({ message: 'กรุณาเลือกไฟล์อย่างน้อย 1 ไฟล์' });

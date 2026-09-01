@@ -50,9 +50,8 @@
     <p class="panel-hint">เอกสารครบ → กด “เอกสารครบถ้วน” ส่งต่อหัวหน้าอนุมัติทันที · ส่งกลับ/ไม่อนุมัติ ต้องระบุเหตุผล</p>
     <app-upload-zone
       [leaveId]="leave.id"
-      [uploadFn]="onVerificationUpload.bind(this)"
-      [canDelete]="true"
-      (uploadComplete)="onVerificationUploadComplete()"
+      [disabled]="true"
+      [canDelete]="false"
     ></app-upload-zone>
     <textarea
       class="remark-input"

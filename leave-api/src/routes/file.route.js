@@ -104,20 +104,23 @@ module.exports = function (fileService) {
           console.error('[file.route] count/duplicate check error', countErr.message);
         }
 
-        // ตรวจสอบ stage & สิทธิ์ตาม role
+        // ตรวจสอบ stage & สิทธิ์ตาม role — DC view-only (LOCK)
         let stage = 'emp';
         if (req.user.role !== 'emp') {
-          // HR/MGR อัปโหลดได้เฉพาะตอน DC (ตรวจสอบความครบถ้วน) — VC removed
-          if (leave.current_status !== STATUS.DC.code) {
-            return res.status(400).json({ message: 'ไม่สามารถอัปโหลดได้ สถานะปัจจุบันไม่อยู่ในการตรวจสอบเอกสาร (ต้องเป็น DC)' });
+          // DC view-only — HR/MGR ดูได้อย่างเดียว ห้ามแนบเพิ่ม
+          if (leave.current_status === STATUS.DC.code) {
+            return res.status(403).json({ message: 'สถานะรอตรวจสอบเอกสาร ไม่สามารถแนบเพิ่มได้' });
           }
-          stage = 'pretemp';
+          // HR/MGR uploads disabled at all statuses after DC view-only change
+          return res.status(403).json({ message: 'สถานะรอตรวจสอบเอกสาร ไม่สามารถแนบเพิ่มได้' });
         } else {
-          // Emp อัปโหลดได้ที่ SU และ DC (และกรณีส่งกลับ SU+Y)
-          // DC อนุญาตจนกว่า pretempPass จะเปลี่ยนเป็น MA
-          const allowedEmpStatuses = [STATUS.SU.code, STATUS.DC.code];
+          // Emp อัปโหลดได้เฉพาะ SU (และกรณีส่งกลับ SU+Y) — DC view-only ห้ามเพิ่ม
+          const allowedEmpStatuses = [STATUS.SU.code];
           const isAllowed = allowedEmpStatuses.includes(leave.current_status) || leave.flag_send_back === 'Y';
           if (!isAllowed) {
+            if (leave.current_status === STATUS.DC.code) {
+              return res.status(403).json({ message: 'สถานะรอตรวจสอบเอกสาร ไม่สามารถแนบเพิ่มได้' });
+            }
             return res.status(400).json({ message: 'สถานะปัจจุบันไม่อนุญาตให้อัปโหลดเอกสาร' });
           }
         }
