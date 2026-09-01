@@ -1,0 +1,315 @@
+// ───────────────────────────────────────────────
+//  Design Tokens (match leave-form / leave-history SCSS)
+// ───────────────────────────────────────────────
+$color-primary:          #0E3362;
+$color-primary-light:    #e8f0fe;
+$color-text:             #333;
+$color-text-secondary:   #666;
+$color-border:           #ddd;
+$color-border-focus:     $color-primary;
+$color-error:            #c62828;
+$color-error-bg:         #fce4ec;
+$color-success-bg:       #e8f5e9;
+$color-white:            #fff;
+$color-bg:               #f5f7fa;
+$color-badge-bg:         #e8ecf0;
+
+$color-danger:           #c62828;
+$color-warning:          #e65100;
+$color-success:          #2e7d32;
+
+$font-family: 'Sarabun','Noto Sans Thai',system-ui,-apple-system,'Segoe UI',sans-serif;
+$radius-input:           6px;
+$radius-card:            12px;
+$shadow-card:            0 2px 12px rgba(0, 0, 0, 0.08);
+$transition:             0.2s ease;
+
+// ───────────────────────────────────────────────
+//  Page Container
+// ───────────────────────────────────────────────
+.audit-page {
+  max-width: 1200px;
+  margin: 32px auto;
+  padding: 0 20px;
+  font-family: $font-family;
+}
+
+// ───────────────────────────────────────────────
+//  Header
+// ───────────────────────────────────────────────
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 12px;
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    h2 {
+      margin: 0;
+      color: $color-primary;
+      font-size: 22px;
+      font-weight: 600;
+
+      i {
+        margin-right: 6px;
+      }
+    }
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+}
+
+.btn-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: $color-primary;
+  text-decoration: none;
+  transition: background $transition;
+
+  &:hover {
+    background: $color-primary-light;
+  }
+}
+
+.user-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: $color-badge-bg;
+  border-radius: 20px;
+  font-size: 13px;
+  color: $color-text-secondary;
+  white-space: nowrap;
+}
+
+.btn-logout {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid $color-border;
+  border-radius: $radius-input;
+  background: $color-white;
+  color: $color-text-secondary;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all $transition;
+  font-family: inherit;
+
+  &:hover:not(:disabled) {
+    border-color: $color-error;
+    color: $color-error;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+// ───────────────────────────────────────────────
+//  Search Row (server-search additive)
+// ───────────────────────────────────────────────
+.search-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 16px;
+}
+
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1.5px solid $color-border;
+  border-radius: $radius-input;
+  background: $color-white;
+  max-width: 320px;
+  flex: 1;
+  transition: border-color $transition, box-shadow $transition;
+
+  i { color: $color-text-secondary; font-size: 14px; }
+  input { flex: 1; border: none; outline: none; font-size: 14px; font-family: inherit; color: $color-text; background: transparent; }
+  button { border: none; background: transparent; cursor: pointer; color: $color-text-secondary; padding: 2px 6px; font-size: 14px; line-height: 1; }
+  &:focus-within { border-color: $color-border-focus; box-shadow: 0 0 0 3px rgba($color-primary, 0.12); }
+}
+
+// ───────────────────────────────────────────────
+//  Loading / Error
+// ───────────────────────────────────────────────
+.loading {
+  text-align: center;
+  padding: 48px 0;
+  color: $color-text-secondary;
+  font-size: 15px;
+}
+
+.result-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 16px;
+  background: $color-error-bg;
+  color: $color-error;
+  border-radius: $radius-input;
+  font-size: 14px;
+  margin-bottom: 16px;
+
+  i { font-size: 16px; }
+}
+
+// ───────────────────────────────────────────────
+//  Tags / Badges (shared style)
+// ───────────────────────────────────────────────
+.method-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  letter-spacing: 0.3px;
+}
+
+.method-get {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+
+.method-post {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.method-put {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.method-patch {
+  background: #f3e5f5;
+  color: #6a1b9a;
+}
+
+.method-delete {
+  background: #fce4ec;
+  color: #c62828;
+}
+
+.method-other {
+  background: $color-badge-bg;
+  color: $color-text-secondary;
+}
+
+.status-tag {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.status-success {
+  background: #e8f5e9;
+  color: $color-success;
+}
+
+.status-warning {
+  background: #fff8e1;
+  color: #f57f17;
+  border: 1px solid #ffe082;
+}
+
+.status-error {
+  background: $color-error-bg;
+  color: $color-error;
+}
+
+.status-fatal {
+  background: #fce4ec;
+  color: #b71c1c;
+  border: 1px solid #ef9a9a;
+}
+
+.status-other {
+  background: $color-badge-bg;
+  color: $color-text-secondary;
+}
+
+.action-tag {
+  display: inline-block;
+  padding: 3px 12px;
+  border-radius: 12px;
+  background: $color-badge-bg;
+  font-size: 13px;
+  color: $color-text;
+  white-space: nowrap;
+}
+
+.user-id-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #eef2f7;
+  font-size: 12px;
+  color: $color-text-secondary;
+  font-family: monospace;
+}
+
+.path-text {
+  font-size: 13px;
+  color: $color-text;
+  word-break: break-all;
+}
+
+.text-muted {
+  color: #999;
+  font-size: 13px;
+}
+
+// highlight mark
+:host ::ng-deep mark {
+  background: #fff176;
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+// ───────────────────────────────────────────────
+//  Responsive — 600px breakpoint
+// ───────────────────────────────────────────────
+@media (max-width: 600px) {
+  .audit-page {
+    margin: 16px auto;
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: stretch;
+
+    .header-left,
+    .header-right {
+      justify-content: center;
+    }
+
+    .header-right {
+      flex-wrap: wrap;
+    }
+  }
+}

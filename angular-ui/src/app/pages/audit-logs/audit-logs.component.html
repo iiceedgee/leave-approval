@@ -1,0 +1,105 @@
+<div class="audit-page">
+  <!-- Header -->
+  <div class="page-header">
+    <div class="header-left">
+      <a class="btn-back" routerLink="/dashboard" [attr.aria-label]="'กลับ'">
+        <i class="fa-solid fa-arrow-left"></i>
+      </a>
+      <h2><i class="fa-solid fa-clipboard-list"></i> ประวัติ Audit</h2>
+    </div>
+    <div class="header-right">
+      <app-notification-bell></app-notification-bell>
+      <span class="user-badge">
+        <i class="fa-regular fa-user"></i> {{ user?.fullName }}
+      </span>
+      <button class="btn-logout" (click)="logout()">
+        <i class="fa-solid fa-right-from-bracket"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div class="loading" *ngIf="loading">กำลังโหลด...</div>
+
+  <!-- Error -->
+  <div class="result-error" *ngIf="errorMessage">
+    <i class="fa-solid fa-circle-exclamation"></i> {{ errorMessage }}
+  </div>
+
+  <!-- Search Row -->
+  <div class="search-row" *ngIf="!loading">
+    <div class="search-box">
+      <i class="fa-solid fa-magnifying-glass"></i>
+      <input [(ngModel)]="q" (ngModelChange)="onSearch($event)" placeholder="ค้นหา method/path/status..." aria-label="ค้นหา">
+      <button *ngIf="q" (click)="clearSearch()" aria-label="ล้างค้นหา">✕</button>
+    </div>
+  </div>
+
+  <!-- Audit Grid -->
+  <dx-data-grid *ngIf="!loading" [dataSource]="filteredLogs" [showBorders]="true" [columnAutoWidth]="true"
+    [rowAlternationEnabled]="true" [hoverStateEnabled]="true" noDataText="ไม่มีประวัติ Audit"
+    (onOptionChanged)="onGridOptionChanged($event)">
+    <dxo-paging [pageSize]="limit" [pageIndex]="page - 1"></dxo-paging>
+    <dxo-editing [allowAdding]="false" [allowDeleting]="false" [allowUpdating]="false"></dxo-editing>
+    <dxo-pager [showPageSizeSelector]="true" [allowedPageSizes]="[10, 20, 50]" [showInfo]="true"
+      [showNavigationButtons]="true" [visible]="true" infoText="หน้า {0} จาก {1} ({2} รายการ)"></dxo-pager>
+    <dxo-sorting mode="single"></dxo-sorting>
+    <dxo-search-panel [visible]="false"></dxo-search-panel>
+    <dxo-filter-row [visible]="false"></dxo-filter-row>
+
+    <dxi-column [width]="80" caption="ลำดับ" alignment="center" cellTemplate="rowNumTemplate">
+      <div *dxTemplate="let cell of 'rowNumTemplate'">
+        {{ cell.component.pageIndex() * cell.component.pageSize() + cell.rowIndex + 1 }}
+      </div>
+    </dxi-column>
+
+    <dxi-column caption="วันเวลา" alignment="center" cellTemplate="timeTemplate" [width]="180">
+      <div *dxTemplate="let data of 'timeTemplate'">
+        {{ formatThaiTime(data.data.timestamp) }}
+      </div>
+    </dxi-column>
+
+    <dxi-column caption="ผู้ทำ" alignment="center" cellTemplate="userTemplate" [width]="120">
+      <div *dxTemplate="let data of 'userTemplate'">
+        <span *ngIf="data.data.userId; else noUser" class="user-id-tag" [title]="data.data.userId">{{ data.data.userId | slice:0:8 }}</span>
+        <ng-template #noUser><span class="text-muted">—</span></ng-template>
+      </div>
+    </dxi-column>
+
+    <dxi-column caption="การกระทำ" alignment="center" cellTemplate="actionTemplate" [width]="160">
+      <div *dxTemplate="let data of 'actionTemplate'">
+        <span class="action-tag">{{ mapThai(data.data.path, data.data.method) }}</span>
+      </div>
+    </dxi-column>
+
+    <dxi-column dataField="method" caption="Method" alignment="center" cellTemplate="methodTemplate" [width]="100">
+      <div *dxTemplate="let data of 'methodTemplate'">
+        <span class="method-badge" [ngClass]="getMethodClass(data.data.method)" [innerHTML]="highlight(data.data.method, q)"></span>
+      </div>
+    </dxi-column>
+
+    <dxi-column dataField="path" caption="Path" alignment="left" cellTemplate="pathTemplate">
+      <div *dxTemplate="let data of 'pathTemplate'">
+        <span class="path-text" [innerHTML]="highlight(data.data.path, q)" [title]="data.data.path"></span>
+      </div>
+    </dxi-column>
+
+    <dxi-column dataField="statusCode" caption="สถานะ" alignment="center" cellTemplate="statusTemplate" [width]="100">
+      <div *dxTemplate="let data of 'statusTemplate'">
+        <span class="status-tag" [ngClass]="getStatusClass(data.data.statusCode)">{{ data.data.statusCode }}</span>
+      </div>
+    </dxi-column>
+
+    <dxi-column dataField="ip" caption="IP" alignment="center" cellTemplate="ipTemplate" [width]="140">
+      <div *dxTemplate="let data of 'ipTemplate'">
+        <span [innerHTML]="highlight(data.data.ip, q)"></span>
+      </div>
+    </dxi-column>
+
+    <dxi-column dataField="durationMs" caption="เวลา (ms)" alignment="center" dataType="number" [width]="110" cellTemplate="durationTemplate">
+      <div *dxTemplate="let data of 'durationTemplate'">
+        {{ data.data.durationMs | number:'1.0-2' }}
+      </div>
+    </dxi-column>
+  </dx-data-grid>
+</div>

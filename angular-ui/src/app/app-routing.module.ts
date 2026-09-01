@@ -7,6 +7,7 @@ import { DashboardComponent } from './pages/dashboard/dashboard.component';
 import { LeaveFormComponent } from './pages/leave-form/leave-form.component';
 import { LeaveDetailComponent } from './pages/leave-detail/leave-detail.component';
 import { LeaveHistoryComponent } from './pages/leave-history/leave-history.component';
+import { AuditLogsComponent } from './pages/audit-logs/audit-logs.component';
 
 const routes: Routes = [
   { path: 'login', component: LoginComponent },
@@ -15,6 +16,7 @@ const routes: Routes = [
   { path: 'leave/:id/edit', component: LeaveFormComponent, canActivate: [AuthGuard, RoleGuard], data: { roles: ['emp'] } },
   { path: 'leave/:id', component: LeaveDetailComponent, canActivate: [AuthGuard] },
   { path: 'my-leaves/history', component: LeaveHistoryComponent, canActivate: [AuthGuard] },
+  { path: 'audit-logs', component: AuditLogsComponent, canActivate: [AuthGuard, RoleGuard], data: { roles: ['hr'] } },
   { path: '', redirectTo: '/login', pathMatch: 'full' },
   { path: '**', redirectTo: '/login' }
 ];

@@ -15,6 +15,12 @@
     </button>
   </div>
 
+  <div class="emp-actions" *ngIf="user?.role === 'hr'">
+    <button class="btn btn-outline" [routerLink]="'/audit-logs'">
+      <i class="fa-solid fa-clipboard-list"></i> ประวัติ Audit
+    </button>
+  </div>
+
   <div class="loading" *ngIf="loading">กำลังโหลด...</div>
 
   <!-- Server-search (additive: แทน client-side dxo-search-panel) -->

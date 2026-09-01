@@ -10,6 +10,7 @@ import { DashboardComponent } from './pages/dashboard/dashboard.component';
 import { LeaveFormComponent } from './pages/leave-form/leave-form.component';
 import { LeaveDetailComponent } from './pages/leave-detail/leave-detail.component';
 import { LeaveHistoryComponent } from './pages/leave-history/leave-history.component';
+import { AuditLogsComponent } from './pages/audit-logs/audit-logs.component';
 import { StepperComponent } from './shared/stepper/stepper.component';
 import { TimelineComponent } from './shared/timeline/timeline.component';
 import { StatusBadgeComponent } from './shared/status-badge/status-badge.component';
@@ -31,6 +32,7 @@ import { HTTP_INTERCEPTORS } from '@angular/common/http';
     LeaveFormComponent,
     LeaveDetailComponent,
     LeaveHistoryComponent,
+    AuditLogsComponent,
     StepperComponent,
     TimelineComponent,
     StatusBadgeComponent,
