@@ -16,13 +16,19 @@
 const LeaveService = require('../src/services/leave.service');
 const { createMockStore } = require('./helpers/mock-store');
 
-// ---- Helper: สร้าง leave ง่ายๆ สำหรับ test ----
+// ---- Helper: สร้าง leave ง่ายๆ สำหรับ test (40y: ใช้พรุ่งนี้ กัน guard ย้อนหลัง leave.service.js:27) ----
+function tomorrowISO(offsetDays = 1) {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString().slice(0, 10);
+}
 async function createLeave(service) {
   return service.create(1, {
     leave_type: 'ลาป่วย',
-    start_date: '2026-07-27',
-    end_date: '2026-07-29',
-    reason: 'ไม่สบาย',
+    start_date: tomorrowISO(1),
+    end_date: tomorrowISO(3),
+    reason: 'ไม่สบายครับ',
   });
 }
 
@@ -237,6 +243,12 @@ describe('calcLeaveDays', () => {
 
   it('ข้ามปี 30 ธ.ค. - 2 ม.ค. → ควรได้ 4', () => {
     expect(LeaveService.calcLeaveDays('2026-12-30', '2027-01-02')).toBe(4);
+  });
+
+  it('พรุ่งนี้ + 2 วัน → ควรได้ 3 (dynamic กัน guard)', () => {
+    const s = tomorrowISO(1);
+    const e = tomorrowISO(3);
+    expect(LeaveService.calcLeaveDays(s, e)).toBe(3);
   });
 });
 
