@@ -44,7 +44,7 @@ class LeaveService {
   }
 
   // ดึง leaves ตาม role — manager เห็นของลูกทีม, HR เห็นทั้งหมด
-  async getLeaves(userId, role, { page, limit } = {}) {
+  async getLeaves(userId, role, { page, limit, q } = {}) {
     const allLeaves = await this.db.listLeaves();
     const allUsers = await this.db.listUsers();
     const nameMap = new Map(allUsers.map(u => [u.id, u.full_name]));
@@ -70,12 +70,23 @@ class LeaveService {
 
     // เพิ่มชื่อเจ้าของคำขอ (owner_name) — เรียงจาก DB แล้ว (updated_at DESC) ไม่ต้อง sort ซ้ำ
     const mapped = leaves.map(l => ({ ...l, owner_name: nameMap.get(l.user_id) || l.user_id }));
+    // server-search additive: filter ด้วย q ก่อน paging (backward compat: ไม่ส่ง q ก็ไม่ filter)
+    let filtered = mapped;
+    if (q != null && typeof q === 'string' && q.trim().length > 0) {
+      const qq = q.trim().toLowerCase();
+      filtered = mapped.filter(l =>
+        (l.leave_type && String(l.leave_type).toLowerCase().includes(qq)) ||
+        (l.current_status && String(l.current_status).toLowerCase().includes(qq)) ||
+        (l.owner_name && String(l.owner_name).toLowerCase().includes(qq)) ||
+        (l.reason && String(l.reason).toLowerCase().includes(qq))
+      );
+    }
     // backward compat: ถ้าไม่มี page/limit ให้ return array เหมือนเดิม (กัน null ด้วย)
-    if (page == null && limit == null) return mapped;
+    if (page == null && limit == null) return filtered;
     const p = Math.max(1, parseInt(page) || 1);
     const l = Math.min(50, Math.max(1, parseInt(limit) || 10));
-    const total = mapped.length;
-    const data = mapped.slice((p - 1) * l, p * l);
+    const total = filtered.length;
+    const data = filtered.slice((p - 1) * l, p * l);
     return { data, total, page: p, limit: l, totalPages: Math.ceil(total / l) };
   }
 
@@ -317,17 +328,29 @@ class LeaveService {
   }
 
   // ★ ดึงประวัติการลาของพนักงานตามปี
-  async getMyHistory(userId, year, { page, limit } = {}) {
+  async getMyHistory(userId, year, { page, limit, q } = {}) {
     if (!userId) return [];
     const targetYear = year || new Date().getFullYear();
     const allLeaves = await this.db.listLeaves();
-    const filtered = allLeaves
+    const base = allLeaves
       .filter(l => l.user_id === userId && new Date(l.start_date).getFullYear() === targetYear)
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
       .map(l => ({
         ...l,
         used_days: LeaveService.calcLeaveDays(l.start_date, l.end_date),
       }));
+    // server-search additive: filter ด้วย q.trim().toLowerCase() เช็ค leave_type, current_status, reason, start_date, end_date (ทำก่อน paging)
+    let filtered = base;
+    if (q != null && typeof q === 'string' && q.trim().length > 0) {
+      const qq = q.trim().toLowerCase();
+      filtered = base.filter(l =>
+        (l.leave_type && String(l.leave_type).toLowerCase().includes(qq)) ||
+        (l.current_status && String(l.current_status).toLowerCase().includes(qq)) ||
+        (l.reason && String(l.reason).toLowerCase().includes(qq)) ||
+        (l.start_date && String(l.start_date).toLowerCase().includes(qq)) ||
+        (l.end_date && String(l.end_date).toLowerCase().includes(qq))
+      );
+    }
     // backward compat: ถ้าไม่มี page/limit ให้ return array เหมือนเดิม (กัน null ด้วย)
     if (page == null && limit == null) return filtered;
     const p = Math.max(1, parseInt(page) || 1);

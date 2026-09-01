@@ -45,7 +45,14 @@ module.exports = function (leaveService, fileService) {
       const limit = req.query.limit !== undefined ? parseInt(req.query.limit, 10) : undefined;
       if (page !== undefined && (isNaN(page) || page < 1)) return res.status(400).json({ message: 'page ต้องเป็นตัวเลข >= 1' });
       if (limit !== undefined && (isNaN(limit) || limit < 1 || limit > 50)) return res.status(400).json({ message: 'limit ต้องเป็นตัวเลข 1-50' });
-      const result = await leaveService.getMyHistory(req.user.id, year, { page, limit });
+      let q;
+      if (req.query.q !== undefined) {
+        const rawQ = typeof req.query.q === 'string' ? req.query.q : String(req.query.q);
+        const trimmed = rawQ.trim();
+        if (trimmed.length > 100) return res.status(400).json({ message: 'q ต้องไม่เกิน 100 ตัวอักษร' });
+        if (trimmed.length > 0) q = trimmed.toLowerCase();
+      }
+      const result = await leaveService.getMyHistory(req.user.id, year, { page, limit, q });
       return res.json(result);
     } catch (err) { next(err); }
   });
@@ -66,7 +73,14 @@ module.exports = function (leaveService, fileService) {
       const limit = req.query.limit !== undefined ? parseInt(req.query.limit, 10) : undefined;
       if (page !== undefined && (isNaN(page) || page < 1)) return res.status(400).json({ message: 'page ต้องเป็นตัวเลข >= 1' });
       if (limit !== undefined && (isNaN(limit) || limit < 1 || limit > 50)) return res.status(400).json({ message: 'limit ต้องเป็นตัวเลข 1-50' });
-      const r = await leaveService.getLeaves(req.user.id, req.user.role, { page, limit });
+      let q;
+      if (req.query.q !== undefined) {
+        const rawQ = typeof req.query.q === 'string' ? req.query.q : String(req.query.q);
+        const trimmed = rawQ.trim();
+        if (trimmed.length > 100) return res.status(400).json({ message: 'q ต้องไม่เกิน 100 ตัวอักษร' });
+        if (trimmed.length > 0) q = trimmed.toLowerCase();
+      }
+      const r = await leaveService.getLeaves(req.user.id, req.user.role, { page, limit, q });
       return res.json(r);
     } catch(err){ next(err); }
   });

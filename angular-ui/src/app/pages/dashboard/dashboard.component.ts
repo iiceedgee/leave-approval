@@ -24,6 +24,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
   total = 0;
   totalPages = 0;
 
+  // ── Server-search state (additive: แทน dxo-search-panel) ──
+  q = '';
+  searchDebounce: any = null;
+
   readonly roleLabels: Record<string, string> = { emp: 'พนักงาน', mgr: 'หัวหน้า', hr: 'HR' };
 
   constructor(
@@ -43,7 +47,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   loadLeaves(): void {
     this.loading = true;
-    this.leaveService.getLeaves(this.page, this.limit).pipe(takeUntil(this.destroy$)).subscribe({
+    this.leaveService.getLeaves(this.page, this.limit, this.q).pipe(takeUntil(this.destroy$)).subscribe({
       next: (res) => {
         if (Array.isArray(res)) {
           // backward compat: backend ยังส่ง array เดิม
@@ -91,7 +95,42 @@ export class DashboardComponent implements OnInit, OnDestroy {
     }
   }
 
+  onSearch(q: string): void {
+    if (this.searchDebounce) clearTimeout(this.searchDebounce);
+    this.searchDebounce = setTimeout(() => {
+      this.q = (q || '').trim();
+      this.page = 1;
+      this.loadLeaves();
+    }, 300);
+  }
+
+  clearSearch(): void {
+    if (this.searchDebounce) clearTimeout(this.searchDebounce);
+    this.q = '';
+    this.page = 1;
+    this.loadLeaves();
+  }
+
+  highlight(text: string, q: string): string {
+    if (!text || !q || !q.trim()) return this.escapeHtml(text || '');
+    const qq = this.escapeHtml(q.trim());
+    const escaped = this.escapeHtml(text);
+    try {
+      const re = new RegExp(`(${this.escapeRegExp(qq)})`, 'gi');
+      return escaped.replace(re, '<mark>$1</mark>');
+    } catch { return escaped; }
+  }
+
+  private escapeHtml(s: string): string {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  private escapeRegExp(s: string): string {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
   ngOnDestroy(): void {
+    if (this.searchDebounce) clearTimeout(this.searchDebounce);
     this.destroy$.next();
     this.destroy$.complete();
   }

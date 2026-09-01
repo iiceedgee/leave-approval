@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Router } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
@@ -13,7 +13,7 @@ import { formatThaiDateRange, toBuddhistYear, recentYears } from '../../utils/da
   templateUrl: './leave-history.component.html',
   styleUrls: ['./leave-history.component.scss'],
 })
-export class LeaveHistoryComponent implements OnInit {
+export class LeaveHistoryComponent implements OnInit, OnDestroy {
   user: any = null;
   currentYear = new Date().getFullYear();
   selectedYear = this.currentYear;
@@ -29,6 +29,10 @@ export class LeaveHistoryComponent implements OnInit {
   limit = 10;
   total = 0;
   totalPages = 0;
+
+  // ── Server-search state (additive: ไม่พัง pagination เดิม) ──
+  q = '';
+  searchDebounce: any = null;
 
   readonly STATUS_LABELS: Record<string, string> = STATUS_LABELS;
 
@@ -46,12 +50,51 @@ export class LeaveHistoryComponent implements OnInit {
     this.loadData();
   }
 
+  ngOnDestroy(): void {
+    if (this.searchDebounce) clearTimeout(this.searchDebounce);
+  }
+
+  onSearch(q: string): void {
+    if (this.searchDebounce) clearTimeout(this.searchDebounce);
+    // debounce 300ms กันยิง API ถี่
+    this.searchDebounce = setTimeout(() => {
+      this.q = (q || '').trim();
+      this.page = 1;
+      this.loadData();
+    }, 300);
+  }
+
+  clearSearch(): void {
+    if (this.searchDebounce) clearTimeout(this.searchDebounce);
+    this.q = '';
+    this.page = 1;
+    this.loadData();
+  }
+
+  highlight(text: string, q: string): string {
+    if (!text || !q || !q.trim()) return this.escapeHtml(text || '');
+    const qq = this.escapeHtml(q.trim());
+    const escaped = this.escapeHtml(text);
+    try {
+      const re = new RegExp(`(${this.escapeRegExp(qq)})`, 'gi');
+      return escaped.replace(re, '<mark>$1</mark>');
+    } catch { return escaped; }
+  }
+
+  private escapeHtml(s: string): string {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  private escapeRegExp(s: string): string {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
   loadData(): void {
     this.loading = true;
     this.errorMessage = '';
     forkJoin([
       this.leaveService.getMyBalance(this.selectedYear),
-      this.leaveService.getMyHistory(this.selectedYear, this.page, this.limit),
+      this.leaveService.getMyHistory(this.selectedYear, this.page, this.limit, this.q),
     ]).subscribe({
       next: ([balances, historyRes]) => {
         this.balances = Array.isArray(balances) ? balances : [];
