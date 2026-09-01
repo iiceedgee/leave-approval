@@ -19,6 +19,13 @@ class LeaveService {
     if (!data.leave_type || !allowed.includes(data.leave_type.trim())) throw Object.assign(new Error(`leave_type ต้องเป็น ${allowed.join(', ')}`), {statusCode:400});
     if (!data.start_date || !data.end_date || isNaN(Date.parse(data.start_date)) || isNaN(Date.parse(data.end_date))) throw Object.assign(new Error('รูปแบบวันที่ไม่ถูกต้อง (YYYY-MM-DD)'), {statusCode:400});
     if (new Date(data.end_date) < new Date(data.start_date)) throw Object.assign(new Error('วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่ม'), {statusCode:400});
+    // กันย้อนหลัง — ล่วงหน้าอย่างเดียว (วันนี้เป็นต้นไป) — 40ปีวางแบบเข้มสุดก่อน (ใช้ local date กัน timezone เพี้ยน)
+    {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const [y, m, d] = String(data.start_date).split('-').map(Number);
+      const s = new Date(y, (m || 1) - 1, d || 1); s.setHours(0, 0, 0, 0);
+      if (s < today) throw Object.assign(new Error('ไม่สามารถลาวันย้อนหลังได้ — กรุณาเลือกตั้งแต่วันนี้เป็นต้นไป'), { statusCode: 400 });
+    }
     if (!data.reason || data.reason.trim().length < 5) throw Object.assign(new Error('เหตุผลต้องมีอย่างน้อย 5 ตัวอักษร'), {statusCode:400});
     const leave = await this.db.createLeave({
       user_id: userId,
@@ -212,6 +219,13 @@ class LeaveService {
     const effStart = data.start_date || leave.start_date;
     const effEnd = data.end_date || leave.end_date;
     if (effStart && effEnd && new Date(effEnd) < new Date(effStart)) throw Object.assign(new Error('วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่ม'), { statusCode: 400 });
+    // กันย้อนหลังตอนแก้ไขส่งกลับด้วย — ล่วงหน้าอย่างเดียว (local date)
+    {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const [y, m, d] = String(effStart).split('-').map(Number);
+      const s = new Date(y, (m || 1) - 1, d || 1); s.setHours(0, 0, 0, 0);
+      if (s < today) throw Object.assign(new Error('ไม่สามารถลาวันย้อนหลังได้ — กรุณาเลือกตั้งแต่วันนี้เป็นต้นไป'), { statusCode: 400 });
+    }
     if (data.reason !== undefined && (!data.reason || String(data.reason).trim().length < 5)) throw Object.assign(new Error('เหตุผลต้องมีอย่างน้อย 5 ตัวอักษร'), { statusCode: 400 });
 
     const updateFields = { current_status: STATUS.DC.code, flag_send_back: 'N' };

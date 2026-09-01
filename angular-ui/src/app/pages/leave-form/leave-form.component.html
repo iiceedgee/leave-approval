@@ -57,6 +57,7 @@
             type="date"
             [(ngModel)]="startDate"
             [disabled]="isSubmitting"
+            [attr.min]="minDateStr"
             [class.input-error]="isError && !startDate"
           />
           <span class="field-error" *ngIf="isError && !startDate">กรุณาเลือกวันที่เริ่มต้น</span>
@@ -68,6 +69,7 @@
             type="date"
             [(ngModel)]="endDate"
             [disabled]="isSubmitting"
+            [attr.min]="minDateStr"
             [class.input-error]="isError && !endDate"
           />
           <span class="field-error" *ngIf="isError && !endDate">กรุณาเลือกวันที่สิ้นสุด</span>
@@ -75,6 +77,9 @@
       </div>
       <span class="field-error date-error" *ngIf="isError && startDate && endDate && endDate < startDate">
         วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่มต้น
+      </span>
+      <span class="field-error date-error" *ngIf="isError && startDate && minDateStr && startDate < minDateStr">
+        ไม่สามารถลาวันย้อนหลังได้ — กรุณาเลือกตั้งแต่วันนี้เป็นต้นไป
       </span>
 
       <div class="form-group">

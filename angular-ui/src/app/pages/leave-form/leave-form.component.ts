@@ -34,6 +34,15 @@ export class LeaveFormComponent implements OnInit, OnDestroy {
   readonly leaveTypes = ['ลาป่วย', 'ลากิจ', 'ลาพักร้อน', 'ลาคลอด', 'ลาอุปสมบท'];
   readonly NAVIGATION_DELAY_MS = 1500;
 
+  // กันย้อนหลัง — ล่วงหน้าอย่างเดียว (วันนี้เป็นต้นไป) — ใช้ local date 00:00
+  get minDateStr(): string {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
   private destroy$ = new Subject<void>();
 
   /**
@@ -119,8 +128,13 @@ export class LeaveFormComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const s = new Date(this.startDate);
-    const e = new Date(this.endDate);
+    // ใช้ local date กัน timezone เพี้ยน (Bangkok UTC+7)
+    const parseLocal = (v: string) => {
+      const [y, m, d] = String(v).split('-').map(Number);
+      return new Date(y, (m || 1) - 1, d || 1);
+    };
+    const s = parseLocal(this.startDate);
+    const e = parseLocal(this.endDate);
     if (isNaN(s.getTime()) || isNaN(e.getTime())) {
       this.msg = 'รูปแบบวันที่ไม่ถูกต้อง';
       this.isError = true;
@@ -130,6 +144,16 @@ export class LeaveFormComponent implements OnInit, OnDestroy {
       this.msg = 'วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่มต้น';
       this.isError = true;
       return;
+    }
+    // กันย้อนหลัง — ล่วงหน้าอย่างเดียว (วันนี้เป็นต้นไป) — เข้มสุดทุกประเภท (local)
+    {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const ss = parseLocal(this.startDate); ss.setHours(0, 0, 0, 0);
+      if (ss < today) {
+        this.msg = 'ไม่สามารถลาวันย้อนหลังได้ — กรุณาเลือกตั้งแต่วันนี้เป็นต้นไป';
+        this.isError = true;
+        return;
+      }
     }
     if (!this.reason || this.reason.trim().length < 5) {
       this.msg = 'เหตุผลต้องมีอย่างน้อย 5 ตัวอักษร';
