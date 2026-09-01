@@ -36,8 +36,8 @@
   </div>
 
   <!-- Audit Grid -->
-  <dx-data-grid *ngIf="!loading" [dataSource]="filteredLogs" [showBorders]="true" [columnAutoWidth]="true"
-    [rowAlternationEnabled]="true" [hoverStateEnabled]="true" noDataText="ไม่มีประวัติ Audit"
+  <dx-data-grid *ngIf="!loading && !errorMessage" [dataSource]="filteredLogs" [showBorders]="true" [columnAutoWidth]="true"
+    [rowAlternationEnabled]="true" [hoverStateEnabled]="true" noDataText="ยังไม่มีประวัติ Audit — ลองทำรายการ (ยื่น/อนุมัติ/เข้าสู่ระบบ) แล้วรีเฟรช · ข้อมูลจะถูกล้างเมื่อรีสตาร์ทเซิร์ฟเวอร์ (in-memory 1000 รายการ)"
     (onOptionChanged)="onGridOptionChanged($event)">
     <dxo-paging [pageSize]="limit" [pageIndex]="page - 1"></dxo-paging>
     <dxo-editing [allowAdding]="false" [allowDeleting]="false" [allowUpdating]="false"></dxo-editing>

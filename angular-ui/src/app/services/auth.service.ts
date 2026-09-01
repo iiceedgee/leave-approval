@@ -15,6 +15,9 @@ export class AuthService {
   login(username: string, password: string): Observable<LoginResponse> {
     return this.http.post<LoginResponse>(`${this.apiUrl}/auth/login`, { username, password }).pipe(
       tap(res => {
+        // กันเซสชั่นค้าง: เคลียร์ของเก่าก่อนเก็บของใหม่ (emp→hr สลับrole)
+        localStorage.removeItem(this.TOKEN_KEY);
+        localStorage.removeItem(this.USER_KEY);
         localStorage.setItem(this.TOKEN_KEY, res.token);
         localStorage.setItem(this.USER_KEY, JSON.stringify(res.user));
       })

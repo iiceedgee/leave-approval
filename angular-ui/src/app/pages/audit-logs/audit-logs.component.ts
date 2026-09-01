@@ -54,13 +54,16 @@ export class AuditLogsComponent implements OnInit, OnDestroy {
         this.applyFilter();
         this.loading = false;
       },
-      error: () => {
+      error: (err: any) => {
         this.logs = [];
         this.filteredLogs = [];
         this.total = 0;
         this.totalPages = 0;
         this.loading = false;
-        this.errorMessage = 'ไม่สามารถโหลดประวัติ Audit ได้ กรุณาลองอีกครั้ง';
+        const status = err?.status;
+        if (status === 401) this.errorMessage = 'เซสชั่นหมดอายุ กรุณาเข้าสู่ระบบใหม่';
+        else if (status === 403) this.errorMessage = 'ไม่มีสิทธิ์ดู Audit — เฉพาะ HR เท่านั้น';
+        else this.errorMessage = 'ไม่สามารถโหลดประวัติ Audit ได้ กรุณาลองอีกครั้ง';
       },
     });
   }
