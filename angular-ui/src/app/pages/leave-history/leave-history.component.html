@@ -67,7 +67,7 @@
       [showNavigationButtons]="true" [visible]="true" infoText="หน้า {0} จาก {1} ({2} รายการ)"></dxo-pager>
     <dxo-sorting mode="single"></dxo-sorting>
     <dxo-search-panel [visible]="true" [width]="240" placeholder="ค้นหา..."></dxo-search-panel>
-    <dxo-filter-row [visible]="true"></dxo-filter-row>
+    <dxo-filter-row [visible]="false"></dxo-filter-row>
 
     <dxi-column [width]="80" caption="ลำดับ" alignment="center" cellTemplate="rowNumTemplate">
       <div *dxTemplate="let cell of 'rowNumTemplate'">
